@@ -278,6 +278,10 @@
         break;
       }
       case '主将': {
+        if (!state.commander) {
+          box.appendChild(el('p', '', '尚未选择主将（首页 → 开始战斗 → 选将）'));
+          break;
+        }
         var cmd = state.commander;
         var cd = g.DSH_HEROES.byId(cmd.heroId);
         box.appendChild(el('p', '', '主将：' + cd.nick + '（' + cd.name + '）· ' + cd.category + ' · ' + cd.element));

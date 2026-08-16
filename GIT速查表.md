@@ -37,6 +37,7 @@ git pull
 | 第一次 push 弹登录窗口 | 浏览器登录 GitHub 一次即可 |
 | 提示要输密码 | GitHub 不认密码，去网页生成 Personal Access Token（勾 repo 权限），粘贴当密码 |
 | 连不上 GitHub（网络不通） | 项目目录里执行：`git config http.proxy http://127.0.0.1:7897` |
+| 有代理配置但仍连不上 | 试试直连：`git -c http.proxy= -c https.proxy= push`（本机若无需代理可直连 GitHub） |
 | 敲 git 提示不是命令 | 装 Git for Windows（git-scm.com/download/win），默认安装 |
 | 弄乱了想放弃本地改动 | `git checkout -- .`（丢最近未提交改动） |
 | 想撤销上一次 commit | `git reset --soft HEAD~1`（保留改动，重新提交） |
