@@ -17,7 +17,13 @@
     clearSelection();
     selectedUid = uid;
     var card = document.querySelector('.hand-card[data-uid="' + uid + '"]');
-    if (card) card.classList.add('selected');
+    if (card) {
+      card.classList.add('selected');
+      // 滚动手牌区让被选中的卡可见（横向滑动的手牌）
+      if (typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
     // 选中单体卡时，可攻击的敌方金边提示
     document.querySelectorAll('.enemy-card.targetable').forEach(function (c) {
       c.classList.add('aiming');

@@ -158,22 +158,9 @@
     }
   }
 
-  /* ---------------- 手牌区（单排，恒定 331 宽） ----------------
-   * ≤5 张：全尺寸 66px 并排；>5 张：每张缩小 20%（52.8px），叠放且总宽恒定 331
-   */
+  /* ---------------- 手牌区（单排 331 宽，横向滑动，卡多可滚动） ---------------- */
   var HAND_STRIP = 331;
-  var HAND_CARD_FULL = 66;
-  var HAND_CARD_SHRINK = 66 * 0.8; // 缩小 20%
-
-  function handRowMetrics(k, strip) {
-    var cardW = k <= 5 ? HAND_CARD_FULL : HAND_CARD_SHRINK;
-    var overlap = 0;
-    if (cardW * k > strip && k > 1) {
-      var step = (strip - cardW) / (k - 1); // 每张后移步长，保证总宽 = strip
-      overlap = cardW - step;
-    }
-    return { cardW: cardW, overlap: overlap };
-  }
+  var lastHandLen = 0;
 
   function renderHand(state) {
     var zone = document.getElementById('hand-zone');
@@ -181,23 +168,27 @@
     zone.innerHTML = '';
     if (state.hand.length === 0) {
       zone.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
+      lastHandLen = 0;
       return;
     }
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
     var row = el('div', 'hand-row', '');
-    var m = handRowMetrics(state.hand.length, HAND_STRIP);
-    state.hand.forEach(function (uid, i) {
+    state.hand.forEach(function (uid) {
       var hero = g.DSH_GameState.cardDef(state, uid);
       if (!hero) return;
       var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-      card.style.width = m.cardW + 'px';
-      if (i > 0 && m.overlap > 0) card.style.marginLeft = (-m.overlap) + 'px';
       if (uid === selUid) card.classList.add('selected');
       row.appendChild(card);
     });
     zone.appendChild(row);
+
+    // 新抽了牌（手牌变多）→ 自动滚到右侧让最新卡可见；否则保持当前位置
+    if (state.hand.length > lastHandLen && row.scrollWidth && row.clientWidth) {
+      row.scrollLeft = row.scrollWidth;
+    }
+    lastHandLen = state.hand.length;
   }
 
   /* ---------------- 主将天赋及法宝 / 主将底栏 ---------------- */

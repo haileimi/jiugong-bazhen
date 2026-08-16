@@ -972,37 +972,44 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 手牌区（单排，恒定 331 宽；卡多则叠+缩 20%） ---- */
+/* ---- 手牌区（单排 331 宽，横向滑动，卡多可滚动查看） ---- */
 #hand-zone {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 8px 0 6px;
-  min-height: 118px;
+  padding: 0;
+  min-height: 142px;
   width: 331px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   align-items: center;
   justify-content: center;
 }
 .hand-row {
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  min-height: 100px;
+  justify-content: flex-start;
   width: 100%;
+  min-height: 136px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  padding: 30px 6px 8px;
+  scrollbar-width: none;
 }
+.hand-row::-webkit-scrollbar { display: none; }
 .hand-card {
   position: relative;
-  width: 66px;
+  width: 62px;
   aspect-ratio: 210 / 305;
   margin-left: 0;
   flex: 0 0 auto;
   cursor: pointer;
   transition: transform 0.15s ease, z-index 0s;
+  scroll-snap-align: center;
 }
+.hand-card + .hand-card { margin-left: -10px; }
 .hand-card:hover { transform: translateY(-8px); z-index: 6; }
 .hand-card.selected {
   transform: scale(1.2) translateY(-16px);
