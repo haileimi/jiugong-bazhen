@@ -1364,3 +1364,12 @@ body {
   cursor: pointer;
 }
 .ghost-btn:hover { border-color: var(--gold-soft); color: var(--gold-soft); }
+
+/* ---- 起始点：王下村 ---- */
+.map-node.start {
+  border-color: rgba(46, 204, 113, 0.6);
+  border-style: dashed;
+  background: rgba(46, 204, 113, 0.06);
+}
+.map-node.start .map-node-label { color: #7ddfa0; }
+.map-node.start .map-node-state { color: #7ddfa0; }

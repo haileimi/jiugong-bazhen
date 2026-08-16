@@ -142,6 +142,14 @@
       link.className = 'map-link' + (node.done ? ' done' : '');
       nodesEl.appendChild(link);
     });
+
+    // 起始点：王下村（路径最下方）
+    var start = document.createElement('div');
+    start.className = 'map-node start';
+    start.innerHTML = '<div class="map-node-icon">🏘</div>' +
+      '<div class="map-node-label">王下村</div>' +
+      '<div class="map-node-state">起点</div>';
+    nodesEl.appendChild(start);
   }
 
   function showMap() {
