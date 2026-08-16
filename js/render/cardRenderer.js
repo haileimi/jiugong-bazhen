@@ -11,6 +11,37 @@
   var CAT_ICON = { '战斗': '⚔', '护卫': '🛡', '计谋': '🔮' };
   var TARGET_TEXT = { single: '单体', all: '全体', self: '自身' };
 
+  /** 卡面右上角数值（攻击/防御/关键数） */
+  function statNumber(hero) {
+    if (hero.category === '战斗') return hero.damage;
+    if (hero.category === '护卫') {
+      if (hero.defGain > 0) return hero.defGain;
+      if (hero.atkDown > 0) return hero.atkDown;
+      if (hero.heal > 0) return hero.heal;
+      return '';
+    }
+    if (hero.draw > 0) return hero.draw;
+    if (hero.tianjiUp > 0) return '天+1';
+    if (hero.atkDown > 0) return hero.atkDown;
+    if (hero.fillHand) return 10;
+    return '';
+  }
+
+  function statText(hero) {
+    if (hero.category === '战斗') return '攻击 ' + hero.damage;
+    if (hero.category === '护卫') {
+      if (hero.defGain > 0) return '防御 +' + hero.defGain;
+      if (hero.atkDown > 0) return '目标攻击 -' + hero.atkDown + '%';
+      if (hero.heal > 0) return '恢复 ' + hero.heal + ' 点血量';
+      return '';
+    }
+    if (hero.draw > 0) return '抽 ' + hero.draw + ' 张';
+    if (hero.tianjiUp > 0) return '本场天机上限 +1';
+    if (hero.atkDown > 0) return '目标攻击 -' + hero.atkDown + '%';
+    if (hero.fillHand) return '手牌抽满至 10';
+    return '';
+  }
+
   /** 血条平滑动画缓存 */
   var prevBar = {};
 
@@ -42,18 +73,25 @@
     card.dataset.heroId = hero.id;
     card.dataset.target = hero.target;
 
-    // 顶部青色名称横幅（诨名）
+    // 顶部青色横幅：左上=角色（谋士/防护/战斗）+ 诨名
     var banner = document.createElement('div');
     banner.className = 'kc-banner';
-    banner.textContent = hero.nick;
+    var role = document.createElement('span');
+    role.className = 'kc-role';
+    role.textContent = CAT_ICON[hero.category] || '?';
+    var name = document.createElement('span');
+    name.className = 'kc-name';
+    name.textContent = hero.nick;
+    banner.appendChild(role);
+    banner.appendChild(name);
     banner.title = hero.name + ' · ' + hero.category + ' · ' + (TARGET_TEXT[hero.target] || '');
     card.appendChild(banner);
 
-    // 金色角标（五行）
+    // 金色角标：右上=数值（攻击/防御）
     var badge = document.createElement('div');
     badge.className = 'kc-badge';
-    badge.textContent = g.DSH_ELEMENTS.ICON[hero.element] || '';
-    badge.title = hero.element;
+    badge.textContent = statNumber(hero);
+    badge.title = statText(hero);
     card.appendChild(badge);
 
     // 插画区（黑底 + 立绘 + 纹理 + 光）
@@ -89,6 +127,8 @@
   g.DSH_CardRenderer = {
     CAT_ICON: CAT_ICON,
     TARGET_TEXT: TARGET_TEXT,
+    statNumber: statNumber,
+    statText: statText,
     imageSrc: imageSrc,
     setHpBar: setHpBar,
     resetHpBars: resetHpBars,

@@ -158,7 +158,21 @@
     }
   }
 
-  /* ---------------- 手牌区（两行：默认上 3 下 2，随数量平均分布） ---------------- */
+  /* ---------------- 手牌区（恒定 331 宽；上排 331 / 下排 331-48=283） ----------------
+   * ≤5 张：全尺寸 66px 并排；>5 张：每张缩小 20%（52.8px），叠放且总宽恒定 331
+   */
+  var HAND_STRIP = 331;
+  var HAND_STRIP_BOTTOM = 331 - 48;
+  var HAND_CARD_FULL = 66;
+  var HAND_CARD_SHRINK = 66 * 0.8; // 缩小 20%
+
+  function handRowMetrics(k, strip) {
+    var cardW = k <= 5 ? HAND_CARD_FULL : HAND_CARD_SHRINK;
+    var overlap = 0;
+    if (cardW * k > strip) overlap = cardW - strip / k;
+    return { cardW: cardW, overlap: overlap };
+  }
+
   function renderHand(state) {
     var zone = document.getElementById('hand-zone');
     if (!zone) return;
@@ -172,24 +186,22 @@
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
-    function buildRow(uids, cls) {
+    function buildRow(uids, cls, strip) {
       var row = el('div', 'hand-row ' + cls, '');
+      var m = handRowMetrics(uids.length, strip);
       uids.forEach(function (uid, i) {
         var hero = g.DSH_GameState.cardDef(state, uid);
         if (!hero) return;
         var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-        // 扇形：中间直、两侧微转（Main Container 复刻）
-        var angle = (i - (uids.length - 1) / 2) * 4;
-        var lift = -Math.abs(angle) * 0.6;
-        card.style.setProperty('--fan', 'rotate(' + angle + 'deg)');
-        card.style.setProperty('--fan-y', 'translateY(' + lift + 'px)');
+        card.style.width = m.cardW + 'px';
+        if (i > 0 && m.overlap > 0) card.style.marginLeft = (-m.overlap) + 'px';
         if (uid === selUid) card.classList.add('selected');
         row.appendChild(card);
       });
       return row;
     }
-    zone.appendChild(buildRow(state.hand.slice(0, topCount), 'hand-row-top'));
-    zone.appendChild(buildRow(state.hand.slice(topCount), 'hand-row-bottom'));
+    zone.appendChild(buildRow(state.hand.slice(0, topCount), 'hand-row-top', HAND_STRIP));
+    zone.appendChild(buildRow(state.hand.slice(topCount), 'hand-row-bottom', HAND_STRIP_BOTTOM));
   }
 
   /* ---------------- 主将天赋及法宝 / 主将底栏 ---------------- */

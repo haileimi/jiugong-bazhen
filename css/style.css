@@ -972,13 +972,15 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 手牌区（两行：默认上 3 下 2，随张数平均分布） ---- */
+/* ---- 手牌区（恒定 331 宽；两行：默认上 3 下 2，卡多则叠+缩 20%） ---- */
 #hand-zone {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 8px 6px 6px;
-  min-height: 252px;
+  padding: 8px 0 6px;
+  min-height: 222px;
+  width: 331px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -989,19 +991,18 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 118px;
+  min-height: 100px;
   width: 100%;
 }
 .hand-card {
   position: relative;
-  width: 64px;
+  width: 66px;
   aspect-ratio: 210 / 305;
-  margin-left: -20px;
+  margin-left: 0;
   flex: 0 0 auto;
   cursor: pointer;
   transition: transform 0.15s ease, z-index 0s;
 }
-.hand-row .hand-card:first-child { margin-left: 0; }
 .hand-card:hover { transform: translateY(-8px); z-index: 6; }
 .hand-card.selected {
   transform: scale(1.2) translateY(-16px);
@@ -1391,40 +1392,46 @@ body {
 .kc-banner {
   position: absolute;
   top: 0.4%;
-  left: 4.5%;
-  width: 52%;
+  left: 4%;
+  width: 58%;
   height: 16.5%;
   background: #61DAFF;
   border-radius: 6px 0 0 0;
   color: #000;
   font-weight: bold;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1;
   display: flex;
   align-items: center;
-  padding: 0 5px;
+  gap: 2px;
+  padding: 0 4px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   z-index: 3;
   pointer-events: none;
+}
+.kc-role { font-size: 11px; flex: 0 0 auto; }
+.kc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .kc-badge {
   position: absolute;
   top: 0.4%;
-  right: 4.5%;
-  height: 8%;
-  min-width: 14%;
+  right: 4%;
+  width: 24%;
+  height: 10%;
   background: #FDC703;
   border-radius: 0 6px 0 0;
   color: #000;
   font-weight: bold;
-  font-size: 9px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
+  padding: 0 2px;
   z-index: 3;
   pointer-events: none;
 }
