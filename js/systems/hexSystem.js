@@ -1,51 +1,64 @@
 /**
- * hexSystem.js — 卦象合成（下卦/上卦/64卦）
+ * hexSystem.js — 卦象（v3：每场战斗重新算，按回合解锁）
  *
- * 下卦：九宫格第 1 行前 3 格（slot 0-2）英雄的阴阳爻合成（slot0=下爻...slot2=上爻）；
- *       每回合随新阵容重算。
- * 上卦：开局从 3 个随机候选八卦中三选一，一局固定。
- * 64 卦：下卦 × 上卦合成（由 hex64.js 查表），特效随下卦重算而变化。
+ * 节奏：第 3 回合抽下卦 → 第 5 回合抽上卦 → 第 7 回合合成 64 卦（天命技能生效）。
+ * 每场战斗开始全部清空，重新走一遍 3/5/7 节奏。
+ * 上/下卦均为随机抽取（不再由布阵合成，不再开局三选一）。
  */
 (function (g) {
   'use strict';
 
-  /** 由桌面第 1 行（slot 0-2）合成下卦；空缺格按「阳」处理（空位不阻断成卦） */
-  function composeLower(state) {
-    var yao = [];
-    for (var i = 0; i < 3; i++) {
-      var id = state.board[i];
-      var hero = id ? g.DSH_GameState.getHero(state, id) : null;
-      if (hero && hero.hp > 0) yao.push(hero.yinYang === '阳' ? '阳' : '阴');
-      else yao.push('阳'); // 空位计为阳（填位不空卦）
-    }
-    return g.DSH_TRIGRAMS.composeLower(yao[0], yao[1], yao[2]);
+  /** 随机抽一卦 */
+  function drawRandomTrigram(state) {
+    var pool = g.DSH_TRIGRAMS.TRIGRAMS;
+    return pool[Math.floor(state.rnd() * pool.length)].id;
   }
 
-  /** 开局生成 3 个随机候选上卦（不重复） */
-  function pickCandidates(state) {
-    var pool = g.DSH_TRIGRAMS.TRIGRAMS.slice();
-    // Fisher-Yates
-    for (var i = pool.length - 1; i > 0; i--) {
-      var j = Math.floor(state.rnd() * (i + 1));
-      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
-    }
-    return pool.slice(0, 3).map(function (t) {
-      return { id: t.id, name: t.name, symbol: t.symbol, desc: t.desc, rules: t.rules };
-    });
+  /** 第 3 回合：抽下卦 */
+  function drawLower(state) {
+    if (state.lowerTrigram) return state.lowerTrigram;
+    state.lowerTrigram = drawRandomTrigram(state);
+    g.DSH_GameState.pushLog(state, '☯ 天机垂象：抽得下卦『' +
+      g.DSH_TRIGRAMS.byId(state.lowerTrigram).name + '』（' +
+      g.DSH_TRIGRAMS.byId(state.lowerTrigram).symbol + '）');
+    return state.lowerTrigram;
   }
 
-  /** 选定上卦后：计算下卦与当前 64 卦 */
+  /** 第 5 回合：抽上卦 */
+  function drawUpper(state) {
+    if (state.upperTrigram) return state.upperTrigram;
+    state.upperTrigram = drawRandomTrigram(state);
+    g.DSH_GameState.pushLog(state, '☯ 天机垂象：抽得上卦『' +
+      g.DSH_TRIGRAMS.byId(state.upperTrigram).name + '』（' +
+      g.DSH_TRIGRAMS.byId(state.upperTrigram).symbol + '）');
+    return state.upperTrigram;
+  }
+
+  /** 第 7 回合：合成 64 卦（天命技能） */
   function resolveHexagram(state) {
-    var lower = composeLower(state);
-    state.lowerTrigram = lower ? lower.id : 'qian';
+    if (!state.upperTrigram || !state.lowerTrigram) return null;
     var hex = g.DSH_HEX64.byPair(state.upperTrigram, state.lowerTrigram);
     state.currentHexagram = hex;
     return hex;
   }
 
+  /** 当前卦象节奏文案（UI 用） */
+  function hexProgressText(state) {
+    if (state.currentHexagram) {
+      return '『' + state.currentHexagram.name + '』天命技能已生效';
+    }
+    if (state.turn >= 7) return '天命技能生效中';
+    var parts = [];
+    parts.push('下卦' + (state.lowerTrigram ? '✓' : '（第3回合）'));
+    parts.push('上卦' + (state.upperTrigram ? '✓' : '（第5回合）'));
+    parts.push('天命（第7回合）');
+    return parts.join(' · ');
+  }
+
   g.DSH_HexSystem = {
-    composeLower: composeLower,
-    pickCandidates: pickCandidates,
-    resolveHexagram: resolveHexagram
+    drawLower: drawLower,
+    drawUpper: drawUpper,
+    resolveHexagram: resolveHexagram,
+    hexProgressText: hexProgressText
   };
 })(typeof window !== 'undefined' ? window : globalThis);

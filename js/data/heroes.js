@@ -1,74 +1,112 @@
 /**
- * heroes.js — 12 名英雄 + 兵种特技 + 皮肤（skins）
- * 字段：攻/血（攻击力/血量=防御值）。血量保留在牌库，战死永久移出。
- * 阴阳（阳/阴）用于下卦合成：slot0=下爻, slot1=中爻, slot2=上爻。
+ * heroes.js — 13 名英雄（v3 主将制）
  *
- * 皮肤（皮肤概念，为后续扩展预留）：
- *   skins: [{ id, name, file }]
- *   立绘目录：images/hero/<英雄id>/<皮肤id>.png（默认取第一项）
+ * 每名英雄既可当「主将」（有血量、被怪打、带被动天赋），也可作为「偏将」（招式牌进卡包）。
+ * 类别（与五行脱钩，五行只做克制结算）：
+ *   战斗 = 发起攻击（多为单体需点怪，例外为全体直接打出）
+ *   护卫 = 使用技能 / 增加防御（自身，点出即打；闷嘴石为例外：单体指向减伤+回血）
+ *   计谋 = 类似杀戮尖塔能力牌（自身=抽牌/能力；冷算子为例外：单体指向减益）
+ *
+ * 指向类型 target：
+ *   single = 点手牌 → 放大 20%+轻摆 → 点怪物 → 打出
+ *   all    = 点手牌直接打出（群体）
+ *   self   = 点手牌直接打出（作用主将/全场）
+ *
+ * 主将模型：血量（命，归零=输）+ 防御（护盾条，每场战斗开始归零，受击先扣防御再扣血）。
+ * 恢复类效果一律恢复血量。
  */
 (function (g) {
   'use strict';
 
-  /** 兵种特技（攻击时 25% 概率触发） */
-  var ROLES = {
-    '武卒': { name: '烈焰斩', mult: 1.6 },
-    '骑兵': { name: '破甲突袭', mult: 1.4 },
-    '弓手': { name: '贯日箭', mult: 1.4 },
-    '谋士': { name: '蚀骨计', mult: 1.3 },
-    '盾卫': { name: '坚盾反击', mult: 1.8 }
-  };
-  var SKILL_CHANCE = 0.25;
+  var CATEGORY = { '战斗': 1, '护卫': 1, '计谋': 1 };
 
-  /** 12 名英雄：id, 兵种, 五行, 诨名, 名字, 阴阳, 攻/血, 皮肤列表 */
   var HEROES = [
-    { id: 'wz1', role: '武卒', element: '火', nick: '红炮',   name: '祝老火', yinYang: '阳', atk: 16, hp: 3,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'wz2', role: '武卒', element: '火', nick: '过山虎', name: '傅寅',   yinYang: '阳', atk: 15, hp: 4,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'wz3', role: '武卒', element: '火', nick: '黑杀',   name: '萧靳',   yinYang: '阴', atk: 15, hp: 4,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'qb1', role: '骑兵', element: '金', nick: '破阵郎', name: '陈昊雷', yinYang: '阳', atk: 13, hp: 7,
-      skins: [{ id: 'default', name: '原版' }, { id: 'beard', name: '蓄须' }] },
-    { id: 'qb2', role: '骑兵', element: '金', nick: '铁脚汉', name: '汪拦山', yinYang: '阳', atk: 12, hp: 8,
-      skins: [{ id: 'gold', name: '金甲' }, { id: 'silver', name: '银甲' }] },
-    { id: 'qb3', role: '骑兵', element: '金', nick: '雪骡子', name: '慕容珩', yinYang: '阴', atk: 12, hp: 8,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'dw1', role: '盾卫', element: '土', nick: '大山汉', name: '穆奎',   yinYang: '阳', atk: 6,  hp: 14,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'dw2', role: '盾卫', element: '土', nick: '闷嘴石', name: '王守岩', yinYang: '阴', atk: 6,  hp: 15,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'gs1', role: '弓手', element: '木', nick: '百步倒', name: '赵星',   yinYang: '阳', atk: 14, hp: 5,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'gs2', role: '弓手', element: '木', nick: '草间溜', name: '徐梢',   yinYang: '阴', atk: 13, hp: 6,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'ms1', role: '谋士', element: '水', nick: '观星眼', name: '苏景澜', yinYang: '阳', atk: 10, hp: 9,
-      skins: [{ id: 'default', name: '原版' }] },
-    { id: 'ms2', role: '谋士', element: '水', nick: '冷算子', name: '希寒川', yinYang: '阴', atk: 9,  hp: 10,
-      skins: [{ id: 'default', name: '原版' }] }
+    /* ---------- 战斗（6 张，5 单体 + 1 全体） ---------- */
+    { id: 'wz1', nick: '红炮',   name: '祝老火', category: '战斗', element: '火', target: 'single',
+      damage: 16, desc: '对目标造成 16 点伤害',
+      skill: { name: '烈焰斩', chance: 0.25, mult: 1.6 },
+      talent: { name: '炮火轰鸣', desc: '战斗牌伤害 +15%', type: 'battlePct', value: 15 },
+      hp: 3, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'wz2', nick: '过山虎', name: '傅寅',   category: '战斗', element: '火', target: 'single',
+      damage: 15, desc: '对目标造成 15 点伤害，25% 附加 1 层燃烧',
+      skill: { name: '灼烧附魔', chance: 0.25, burn: 1 },
+      talent: { name: '猛虎开山', desc: '每回合第一张战斗牌伤害 +4', type: 'firstCardBonus', value: 4 },
+      hp: 4, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'wz3', nick: '黑杀',   name: '萧靳',   category: '战斗', element: '火', target: 'single',
+      damage: 15, desc: '对目标造成 15 点伤害，25% 本击暴击伤害 ×2',
+      skill: { name: '夺命一击', chance: 0.25, critDmg: 2 },
+      talent: { name: '杀心', desc: '暴击率 +15%', type: 'critRate', value: 15 },
+      hp: 4, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'gs1', nick: '百步倒', name: '赵星',   category: '战斗', element: '木', target: 'single',
+      damage: 14, desc: '对目标造成 14 点伤害，25% 追击（不耗天机再打一次）',
+      skill: { name: '追风逐日', chance: 0.25, chase: true },
+      talent: { name: '疾风起手', desc: '本场战斗首回合天机 +1', type: 'firstTurnTianji', value: 1 },
+      hp: 5, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'gs2', nick: '草间溜', name: '徐梢',   category: '战斗', element: '木', target: 'all',
+      damage: 10, desc: '对全体敌人造成 10 点伤害，25% 全体附加 1 层风蚀',
+      skill: { name: '风卷残云', chance: 0.25, windAll: 1 },
+      talent: { name: '风势', desc: '群体攻击伤害 +25%', type: 'aoePct', value: 25 },
+      hp: 6, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'qb3', nick: '雪骡子', name: '慕容珩', category: '战斗', element: '金', target: 'single',
+      damage: 12, desc: '对目标造成 12 点伤害，25% 冻结目标下次行动',
+      skill: { name: '寒霜踏', chance: 0.25, freeze: true },
+      talent: { name: '寒刃', desc: '暴击伤害 +50%', type: 'critDmg', value: 50 },
+      hp: 8, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- 护卫（4 张，3 自身 + 1 单体） ---------- */
+    { id: 'qb1', nick: '破阵郎', name: '陈昊雷', category: '护卫', element: '金', target: 'self',
+      defGain: 9, heal: 0, desc: '获得 9 点防御',
+      talent: { name: '军旗', desc: '每回合天机 +1（3→4）', type: 'tianjiPerTurn', value: 1 },
+      hp: 7, skins: [{ id: 'default', name: '原版' }, { id: 'beard', name: '蓄须' }] },
+    { id: 'qb2', nick: '铁脚汉', name: '汪拦山', category: '护卫', element: '金', target: 'self',
+      defGain: 6, heal: 3, desc: '获得 6 点防御，恢复 3 点血量',
+      talent: { name: '金汤', desc: '开局自带 5 点防御', type: 'startDefense', value: 5 },
+      hp: 8, skins: [{ id: 'gold', name: '金甲' }, { id: 'silver', name: '银甲' }] },
+    { id: 'dw1', nick: '大山汉', name: '穆奎',   category: '护卫', element: '土', target: 'self',
+      defGain: 10, heal: 0, desc: '获得 10 点防御',
+      talent: { name: '不动如山', desc: '受击伤害 -20%', type: 'dmgReduce', value: 20 },
+      hp: 14, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'dw2', nick: '闷嘴石', name: '王守岩', category: '护卫', element: '土', target: 'single',
+      atkDown: 30, heal: 3, desc: '指定怪物伤害 -30%（可叠加至 -60%），恢复 3 点血量',
+      talent: { name: '磐石吐纳', desc: '每回合结束恢复 2 点血量', type: 'endHeal', value: 2 },
+      hp: 15, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- 计谋（3 张，2 自身 + 1 单体） ---------- */
+    { id: 'ms1', nick: '观星眼', name: '苏景澜', category: '计谋', element: '水', target: 'self',
+      draw: 2, tianjiUp: 1, desc: '本场战斗天机上限 +1，抽 2 张',
+      talent: { name: '观星', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
+      hp: 9, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'ms2', nick: '冷算子', name: '希寒川', category: '计谋', element: '水', target: 'single',
+      atkDown: 20, wind: 2, desc: '指定敌人攻击 -20%（可叠加），附加 2 层风蚀',
+      talent: { name: '天算', desc: '每场战斗免死一次（致命伤保留 1 血）', type: 'onceSave' },
+      hp: 10, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'bz1', nick: '白泽',   name: '玄机',   category: '计谋', element: '水', target: 'self',
+      fillHand: true, desc: '将手牌抽满至 10 张（多出的回归卡包）',
+      talent: { name: '神兽之智', desc: '起手 7 张', type: 'drawBonus', value: 2 },
+      hp: 10, skins: [{ id: 'default', name: '原版' }] }
   ];
 
-  /** 展开特技/皮肤字段（只读视图） */
+  /** 只读视图展开 */
   var VIEW = HEROES.map(function (h) {
-    var skill = ROLES[h.role];
     return {
-      id: h.id,
-      role: h.role,
-      element: h.element,
-      nick: h.nick,
-      name: h.name,
-      yinYang: h.yinYang,
-      atk: h.atk,
-      hp: h.hp,
-      maxHp: h.hp,
-      skillName: skill.name,
-      skillMult: skill.mult,
-      skillChance: SKILL_CHANCE,
+      id: h.id, nick: h.nick, name: h.name,
+      category: h.category, element: h.element, target: h.target,
+      desc: h.desc, hp: h.hp,
+      damage: h.damage || 0,
+      defGain: h.defGain || 0, heal: h.heal || 0,
+      atkDown: h.atkDown || 0, wind: h.wind || 0, draw: h.draw || 0,
+      tianjiUp: h.tianjiUp || 0, fillHand: !!h.fillHand,
+      skill: h.skill || null,
+      talent: h.talent,
       skins: h.skins.map(function (s) { return { id: s.id, name: s.name, file: s.id + '.png' }; })
     };
   });
 
-  /** 皮肤辅助 */
+  function byId(id) {
+    for (var i = 0; i < VIEW.length; i++) if (VIEW[i].id === id) return VIEW[i];
+    return null;
+  }
+
   function skinsOf(hero) { return hero.skins || []; }
   function defaultSkinId(hero) { var s = skinsOf(hero); return s.length ? s[0].id : 'default'; }
   function skinOf(hero, skinId) {
@@ -78,15 +116,15 @@
   }
 
   g.DSH_HEROES = {
-    ROLES: ROLES,
-    SKILL_CHANCE: SKILL_CHANCE,
+    CATEGORY: CATEGORY,
     HEROES: VIEW,
-    byId: function (id) {
-      for (var i = 0; i < VIEW.length; i++) if (VIEW[i].id === id) return VIEW[i];
-      return null;
-    },
+    byId: byId,
     skinsOf: skinsOf,
     defaultSkinId: defaultSkinId,
-    skinOf: skinOf
+    skinOf: skinOf,
+    /** 卡包牌型：主将之外的全部英雄（偏将=招式） */
+    packHeroIds: function (commanderId) {
+      return VIEW.filter(function (h) { return h.id !== commanderId; }).map(function (h) { return h.id; });
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

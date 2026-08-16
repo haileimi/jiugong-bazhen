@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>九宫八阵 · 天命牌</title>
-  <link rel="stylesheet" href="css/style.css?v=16">
+  <link rel="stylesheet" href="css/style.css?v=17">
 </head>
 <body>
   <div id="app">
@@ -16,28 +16,82 @@
 
     <!-- 主战场（375px 固定，居中） -->
     <main id="battlefield">
-      <div id="enemy-info"></div>
 
-      <section id="enemy-zone">
-        <div id="enemy-row"></div>
+      <!-- ============ 首页 ============ -->
+      <section id="page-home" class="page">
+        <div class="home-box">
+          <h1 class="home-title">九宫八阵 · 天命牌</h1>
+          <p class="home-sub">v3 主将制 · 一路打怪 · 天命 64 卦</p>
+
+          <div class="home-stats">
+            <div class="home-stat">
+              <span class="home-stat-icon">💰</span>
+              <div>
+                <div class="home-stat-label">马蹄金</div>
+                <div class="home-stat-value" id="home-gold">0</div>
+              </div>
+            </div>
+            <div class="home-stat">
+              <span class="home-stat-icon">🍚</span>
+              <div>
+                <div class="home-stat-label">军粮（每日 5 点）</div>
+                <div class="home-stat-value" id="home-rations">5/5</div>
+              </div>
+            </div>
+          </div>
+
+          <button id="home-start-btn" class="big-btn" type="button">开始战斗</button>
+
+          <div class="home-extra">
+            <button id="home-shop-btn" class="mid-btn" type="button">🏪 商店</button>
+            <button id="home-recruit-btn" class="mid-btn" type="button">🏮 招募所</button>
+          </div>
+        </div>
       </section>
 
-      <section id="river">
-        <div id="river-turn" class="river-item"></div>
-        <div id="river-hex" class="river-item"></div>
-        <div id="river-hint" class="river-item hint"></div>
+      <!-- ============ 地图页 ============ -->
+      <section id="page-map" class="page">
+        <div class="map-box">
+          <div class="map-header">
+            <span id="map-layer" class="map-layer">第 1 层</span>
+            <span class="map-title">🗺 九宫秘境</span>
+          </div>
+          <div id="map-nodes" class="map-nodes"></div>
+          <div class="map-actions">
+            <button id="map-save-btn" class="mid-btn" type="button">💾 保存并退出</button>
+            <button id="map-stats-btn" class="mid-btn" type="button">📊 数据统计</button>
+          </div>
+        </div>
       </section>
 
-      <section id="grid" aria-label="九宫格桌面"></section>
+      <!-- ============ 战斗页 ============ -->
+      <section id="page-battle" class="page">
+        <div id="enemy-info"></div>
 
-      <section id="tianji-row">
-        <span id="tianji-text"></span>
+        <section id="enemy-zone">
+          <div id="enemy-row"></div>
+        </section>
+
+        <section id="river">
+          <div id="river-turn" class="river-item"></div>
+          <div id="river-hex" class="river-item"></div>
+          <div id="river-hint" class="river-item hint"></div>
+        </section>
+
+        <section id="commander-zone"></section>
+
+        <section id="hand-zone"></section>
+
+        <section id="tianji-row">
+          <span id="tianji-text"></span>
+        </section>
+
+        <button id="end-turn-btn" type="button">回合完毕</button>
       </section>
 
-      <button id="end-turn-btn" type="button">回合完毕</button>
     </main>
 
-    <!-- 右侧调试区（不变，动态伸缩） -->
+    <!-- 右侧调试区（动态伸缩） -->
     <aside id="debug-panel">
       <div id="debug-tabs"></div>
       <div id="debug-content"></div>
@@ -47,28 +101,29 @@
   <div id="modal-root"></div>
 
   <!-- 数据层 -->
-  <script src="js/data/elements.js?v=16"></script>
-  <script src="js/data/heroes.js?v=16"></script>
-  <script src="js/data/trigram.js?v=16"></script>
-  <script src="js/data/enemies.js?v=16"></script>
-  <script src="js/data/hex64.js?v=16"></script>
+  <script src="js/data/elements.js?v=17"></script>
+  <script src="js/data/heroes.js?v=17"></script>
+  <script src="js/data/trigram.js?v=17"></script>
+  <script src="js/data/enemies.js?v=17"></script>
+  <script src="js/data/hex64.js?v=17"></script>
   <!-- 核心 -->
-  <script src="js/core/eventSystem.js?v=16"></script>
-  <script src="js/core/gameState.js?v=16"></script>
-  <script src="js/core/turnSystem.js?v=16"></script>
+  <script src="js/core/eventSystem.js?v=17"></script>
+  <script src="js/core/gameState.js?v=17"></script>
+  <script src="js/core/saveSystem.js?v=17"></script>
+  <script src="js/core/turnSystem.js?v=17"></script>
   <!-- 系统 -->
-  <script src="js/systems/hexSystem.js?v=16"></script>
-  <script src="js/systems/ruleSystem.js?v=16"></script>
-  <script src="js/systems/battleSystem.js?v=16"></script>
+  <script src="js/systems/hexSystem.js?v=17"></script>
+  <script src="js/systems/ruleSystem.js?v=17"></script>
+  <script src="js/systems/battleSystem.js?v=17"></script>
   <!-- 渲染 -->
-  <script src="js/render/cardRenderer.js?v=16"></script>
-  <script src="js/render/battleRenderer.js?v=16"></script>
-  <script src="js/render/popupRenderer.js?v=16"></script>
+  <script src="js/render/cardRenderer.js?v=17"></script>
+  <script src="js/render/battleRenderer.js?v=17"></script>
+  <script src="js/render/popupRenderer.js?v=17"></script>
   <!-- 交互 -->
-  <script src="js/input/dragController.js?v=16"></script>
+  <script src="js/input/clickController.js?v=17"></script>
   <!-- 自检 -->
-  <script src="js/test/selftest.js?v=16"></script>
+  <script src="js/test/selftest.js?v=17"></script>
   <!-- 入口 -->
-  <script src="js/main.js?v=16"></script>
+  <script src="js/main.js?v=17"></script>
 </body>
 </html>

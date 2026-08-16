@@ -1,13 +1,13 @@
 /**
- * battleRenderer.js — 战场渲染（敌方/界河/九宫格/天机）+ 调试面板
+ * battleRenderer.js — 战场渲染（敌方 / 界河 / 主将 / 手牌区 / 天机）+ 调试面板（v3）
  *
- * 布局（从上到下，375px 竖屏主战场 + 右侧调试区）：
- * 敌方信息行 → 魔王区域（本体 + 七魔将）→ 界河 → 九宫格 → 天机行 → 回合完毕按钮
+ * 布局（上到下）：敌方信息行 → 敌方（魔王战：本体 + 5 魔将；小怪战：2 魔将）
+ *   → 界河（回合 + 卦象节奏）→ 主将卡 → 手牌区（重叠）→ 天机行 → 回合完毕
  */
 (function (g) {
   'use strict';
 
-  var TABS = ['战斗日志', '卡池', '规则', '英雄名录', '五行克制', '八卦总览', '规则自检'];
+  var TABS = ['战斗日志', '卡包', '主将', '规则', '英雄名录', '五行克制', '八卦总览', '规则自检'];
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -32,8 +32,8 @@
     }
     card.appendChild(nameRow);
 
-    // 攻/五行/全体 信息行
-    var atkLine = el('div', 'enemy-atk', '攻 ' + enemy.atk + (enemy.aoe ? ' · 全体' : '') +
+    var atkLine = el('div', 'enemy-atk', '攻 ' + g.DSH_GameState.enemyAtk(state, enemy) +
+      (enemy.aoe ? ' · 全体' : '') + (state.atkDebuff[enemy.id] ? ' · 削弱-' + state.atkDebuff[enemy.id] + '%' : '') +
       ' · ' + g.DSH_ELEMENTS.ICON[enemy.element] + enemy.element);
     card.appendChild(atkLine);
 
@@ -41,14 +41,10 @@
     var barFill = el('div', 'enemy-hpbar-fill', '');
     bar.appendChild(barFill);
     card.appendChild(bar);
-
-    // 敌方红色血条：受伤/恢复时平滑过渡
     g.DSH_CardRenderer.setHpBar(barFill, enemy.id, enemy.hp, enemy.maxHp);
 
-    var hpText = el('div', 'enemy-hp' + (isBoss ? ' boss-hp' : ''), enemy.hp + '/' + enemy.maxHp);
-    card.appendChild(hpText);
+    card.appendChild(el('div', 'enemy-hp' + (isBoss ? ' boss-hp' : ''), enemy.hp + '/' + enemy.maxHp));
 
-    // 魔王本体附加信息
     if (isBoss) {
       var bossInfo = el('div', 'boss-info');
       bossInfo.textContent = g.DSH_GameState.bossUnlocked(state)
@@ -57,7 +53,6 @@
       card.appendChild(bossInfo);
     }
 
-    // 持续伤害标记
     var marks = [];
     if (state.burnStacks[enemy.id]) marks.push('🔥' + state.burnStacks[enemy.id]);
     if (state.windBurnLayers[enemy.id]) marks.push('🌪' + state.windBurnLayers[enemy.id]);
@@ -67,46 +62,52 @@
     return card;
   }
 
-  /* ---------------- 战场 ---------------- */
   function renderEnemyRow(state) {
     var row = document.getElementById('enemy-row');
     if (!row) return;
     row.innerHTML = '';
-    // 魔王本体独占一行（最上）：解锁后金色高亮并可攻击
-    var bossCard = createEnemyCard(state.boss, state, true);
-    bossCard.classList.add('boss-card');
-    if (g.DSH_GameState.bossUnlocked(state) && state.boss.hp > 0) {
-      bossCard.classList.add('boss-unlocked');
-      bossCard.classList.add('targetable');
-    }
-    row.appendChild(bossCard);
 
-    // 五魔将：上 2 下 3 两排
+    if (state.battleKind === 'boss') {
+      var bossCard = createEnemyCard(state.boss, state, true);
+      bossCard.classList.add('boss-card');
+      if (g.DSH_GameState.bossUnlocked(state) && state.boss.hp > 0) {
+        bossCard.classList.add('boss-unlocked');
+        bossCard.classList.add('targetable');
+      }
+      row.appendChild(bossCard);
+    }
+
     var grid = el('div', 'enemy-grid');
     var line1 = el('div', 'enemy-line');
     var line2 = el('div', 'enemy-line');
     state.enemies.forEach(function (e, i) {
       var c = createEnemyCard(e, state, false);
       if (g.DSH_GameState.enemyAlive(state, e.id)) c.classList.add('targetable');
-      (i < 2 ? line1 : line2).appendChild(c);
+      if (state.battleKind === 'boss') (i < 2 ? line1 : line2).appendChild(c);
+      else line1.appendChild(c);
     });
     grid.appendChild(line1);
     grid.appendChild(line2);
     row.appendChild(grid);
   }
 
-  /** 受击标红+抖动：依据 state.lastHits 对卡牌加动画类 */
+  function renderEnemyTargets(state) {
+    document.querySelectorAll('.enemy-card').forEach(function (c) {
+      var id = c.dataset.enemyId;
+      c.classList.toggle('targetable', g.DSH_GameState.enemyAlive(state, id));
+    });
+  }
+
   function applyHitFlashes(state) {
     state.lastHits.forEach(function (hit) {
       var elCard = null;
       if (hit.kind === 'enemy') {
         elCard = document.querySelector('.enemy-card[data-enemy-id="' + hit.id + '"]');
-      } else {
-        elCard = document.querySelector('.grid-slot .hero-card[data-hero-id="' + hit.id + '"]');
+      } else if (hit.kind === 'commander') {
+        elCard = document.querySelector('.commander-card');
       }
       if (elCard) {
         elCard.classList.remove('hit-flash');
-        // 强制重排以重新触发动画
         void elCard.offsetWidth;
         elCard.classList.add('hit-flash');
         setTimeout(function () { elCard.classList.remove('hit-flash'); }, 600);
@@ -115,22 +116,57 @@
     state.lastHits = [];
   }
 
+  /* ---------------- 界河 ---------------- */
   function renderRiver(state) {
     var turnEl = document.getElementById('river-turn');
     var hexEl = document.getElementById('river-hex');
     var hintEl = document.getElementById('river-hint');
-    if (turnEl) turnEl.textContent = '第 ' + state.turn + ' 回合';
-    if (hexEl && state.currentHexagram) {
-      var hex = state.currentHexagram;
-      hexEl.innerHTML = '<b>『' + hex.name + '』</b> <span class="hex-symbol">' +
-        hex.upperSymbol + hex.lowerSymbol + '</span><br><span class="hex-effect">' +
-        hex.effectText + '</span>';
+    if (turnEl) turnEl.textContent = '第 ' + state.turn + ' 回合 · 第 ' + state.layer + ' 层' +
+      (state.battleKind === 'boss' ? ' · 魔王战' : ' · 小怪战');
+    if (hexEl) {
+      if (state.currentHexagram) {
+        var hex = state.currentHexagram;
+        hexEl.innerHTML = '<b>『' + hex.name + '』</b> <span class="hex-symbol">' +
+          hex.upperSymbol + hex.lowerSymbol + '</span><br><span class="hex-effect">' +
+          hex.effectText + '</span>';
+      } else {
+        hexEl.innerHTML = '<span class="hex-effect">' + g.DSH_HexSystem.hexProgressText(state) + '</span>';
+      }
     }
     if (hintEl) {
-      if (state.over) hintEl.textContent = state.over === 'win' ? '🏆 天命已定，胜利！' : '💀 败局……';
-      else if (state.phase === 'player') hintEl.textContent = '拖动英雄卡到敌方目标上发起攻击';
-      else if (state.phase === 'boss') hintEl.textContent = '魔王行动中……';
+      if (state.over) hintEl.textContent = state.over === 'win' ? '🏆 战斗胜利！' : '💀 主将战死……';
+      else if (state.phase === 'player') hintEl.textContent = '点手牌 → 放大摆动 → 点怪物攻击；护卫/计谋点出即打';
+      else if (state.phase === 'boss') hintEl.textContent = '怪物行动中……';
     }
+  }
+
+  /* ---------------- 手牌区 / 主将 / 天机 ---------------- */
+  function renderHand(state) {
+    var zone = document.getElementById('hand-zone');
+    if (!zone) return;
+    zone.innerHTML = '';
+    var sel = document.querySelector('.hand-card.selected');
+    var selUid = sel ? sel.dataset.uid : null;
+    var bag = el('div', 'hand-bag', '');
+    state.hand.forEach(function (uid) {
+      var hero = g.DSH_GameState.cardDef(state, uid);
+      if (!hero) return;
+      var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
+      if (uid === selUid) card.classList.add('selected');
+      bag.appendChild(card);
+    });
+    if (state.hand.length === 0) {
+      bag.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
+    }
+    zone.appendChild(bag);
+  }
+
+  function renderCommander(state) {
+    var zone = document.getElementById('commander-zone');
+    if (!zone) return;
+    zone.innerHTML = '';
+    var card = g.DSH_CardRenderer.createCommanderCard(state);
+    if (card) zone.appendChild(card);
   }
 
   function renderTianji(state) {
@@ -138,7 +174,8 @@
     if (t) {
       var stars = '';
       for (var i = 0; i < state.maxTianji; i++) stars += i < state.tianji ? '✦' : '☆';
-      t.textContent = '天命 · 天机 ' + state.tianji + '/' + state.maxTianji + '  ' + stars;
+      t.textContent = '天机 ' + state.tianji + '/' + state.maxTianji + '  ' + stars +
+        '（出牌耗 1）';
     }
   }
 
@@ -146,41 +183,22 @@
     var e = document.getElementById('enemy-info');
     if (!e) return;
     var left = state.enemies.filter(function (x) { return x.alive && x.hp > 0; }).length;
-    e.textContent = '魔王：混沌·六爻魔　|　魔将余 ' + left + '/5' +
-      (g.DSH_GameState.bossUnlocked(state) ? '　　⚠ 魔王本体已解锁！' : '');
-  }
-
-  function renderGrid(state) {
-    var grid = document.getElementById('grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    // 两排：上 3 下 2（中宫 slot 1 = 上排中间）
-    var row1 = el('div', 'grid-row');
-    var row2 = el('div', 'grid-row');
-    for (var i = 0; i < 5; i++) {
-      var slot = el('div', 'grid-slot' + (i === g.DSH_GameState.CENTER_SLOT ? ' center' : ''));
-      slot.dataset.slot = i;
-      var heroId = state.board[i];
-      var hero = heroId ? g.DSH_GameState.getHero(state, heroId) : null;
-      if (hero) {
-        var card = g.DSH_CardRenderer.createHeroCard(hero, state, i);
-        slot.appendChild(card);
-      } else {
-        slot.appendChild(el('div', 'grid-empty', ''));
-      }
-      (i < 3 ? row1 : row2).appendChild(slot);
+    var text = '敌方单位 ' + (state.enemies.length) + ' 个，存活 ' + left;
+    if (state.battleKind === 'boss') {
+      text += '　|　魔王：' + state.boss.name +
+        (g.DSH_GameState.bossUnlocked(state) ? '　⚠ 已解锁！' : '（守护中）');
     }
-    grid.appendChild(row1);
-    grid.appendChild(row2);
+    e.textContent = text;
   }
 
-  function renderEnemyTargets(state) {
-    // 高亮可攻击目标
-    document.querySelectorAll('.enemy-card').forEach(function (c) {
-      var id = c.dataset.enemyId;
-      var targetable = g.DSH_GameState.enemyAlive(state, id);
-      c.classList.toggle('targetable', targetable);
-    });
+  function renderAll(state) {
+    renderEnemyInfo(state);
+    renderEnemyRow(state);
+    renderRiver(state);
+    renderCommander(state);
+    renderHand(state);
+    renderTianji(state);
+    renderBattleData(state);
   }
 
   /* ---------------- 左侧战斗数据面板 ---------------- */
@@ -190,46 +208,37 @@
     var html = '';
     var GS = g.DSH_GameState;
 
-    // 卦象
-    if (state.currentHexagram) {
-      var hex = state.currentHexagram;
-      html += '<div class="bd-section"><div class="bd-title">卦象</div>' +
-        '<div class="bd-hex">『' + hex.name + '』 ' + hex.upperSymbol + hex.lowerSymbol + '</div>' +
-        '<div class="bd-hex-rules">' + hex.effectText + '</div></div>';
-    }
+    html += '<div class="bd-section"><div class="bd-title">卦象节奏</div>' +
+      '<div class="bd-hex">' + g.DSH_HexSystem.hexProgressText(state) + '</div></div>';
 
-    // 天机
     var stars = '';
     for (var i = 0; i < state.maxTianji; i++) stars += i < state.tianji ? '✦' : '☆';
     html += '<div class="bd-section"><div class="bd-title">天命 · 天机</div>' +
       '<div class="bd-tianji">' + stars + ' (' + state.tianji + '/' + state.maxTianji + ')</div></div>';
 
-    // 战况统计
-    var aliveHeroes = GS.aliveHeroes(state).length;
-    var aliveEnemies = GS.aliveEnemies(state).length;
-    html += '<div class="bd-section"><div class="bd-title">战况</div>' +
-      '<div class="bd-count">我方存活 ' + aliveHeroes + '/12 ｜ 敌方 ' + aliveEnemies + ' 单位' +
-      (GS.bossUnlocked(state) ? ' ｜ ☠ 魔王已解锁' : '') + '</div></div>';
+    html += '<div class="bd-section"><div class="bd-title">主将</div>' +
+      '<div class="bd-count">' + state.commander.heroId + ' · 血 ' + state.commander.hp + '/' +
+      state.commander.maxHp + ' · 防 ' + state.commander.defense + '</div></div>';
 
-    // 我方英雄状态
-    html += '<div class="bd-section"><div class="bd-title">我方英雄（' + GS.boardHeroes(state).length + '）</div>';
-    GS.boardHeroes(state).forEach(function (b) {
-      var h = b.hero;
-      html += '<div class="bd-row">' + h.nick + ' <span class="bd-dim">攻' + h.atk + ' 防' + h.hp + '/' + h.maxHp + '</span>' +
-        (state.shield[h.id] ? ' <span class="bd-shield">🛡' + state.shield[h.id] + '</span>' : '') +
-        (state.usedThisTurn[h.id] ? ' <span class="bd-acted">✓已动</span>' : '') + '</div>';
+    html += '<div class="bd-section"><div class="bd-title">手牌（' + state.hand.length + '/' + GS.HAND_MAX + '）</div>';
+    state.hand.forEach(function (uid) {
+      var hero = GS.cardDef(state, uid);
+      if (hero) {
+        html += '<div class="bd-row">' + hero.nick + ' <span class="bd-dim">' + hero.category +
+          (state.usedThisTurn[uid] ? ' ✓已用' : '') + '</span></div>';
+      }
     });
     html += '</div>';
 
-    // 敌方状态
     html += '<div class="bd-section"><div class="bd-title">敌方状态</div>';
-    [state.boss].concat(state.enemies).forEach(function (e) {
+    (state.boss ? [state.boss] : []).concat(state.enemies).forEach(function (e) {
       if (!e.alive || e.hp <= 0) return;
       var marks = [];
+      if (state.atkDebuff[e.id]) marks.push('削弱-' + state.atkDebuff[e.id] + '%');
       if (state.burnStacks[e.id]) marks.push('🔥' + state.burnStacks[e.id]);
       if (state.windBurnLayers[e.id]) marks.push('🌪' + state.windBurnLayers[e.id]);
       if (state.frozenNext[e.id] || state.frozen[e.id]) marks.push('🧊');
-      html += '<div class="bd-row">' + (e.id === 'boss' ? '☠ ' : '') + e.name + ' ' +
+      html += '<div class="bd-row">' + (state.boss && e.id === state.boss.id ? '☠ ' : '') + e.name + ' ' +
         e.hp + '/' + e.maxHp + (marks.length ? ' <span class="bd-dim">' + marks.join(' ') + '</span>' : '') + '</div>';
     });
     html += '</div>';
@@ -237,20 +246,11 @@
     box.innerHTML = html;
   }
 
-  /** 全量重绘 */
-  function renderAll(state) {
-    renderEnemyInfo(state);
-    renderEnemyRow(state);
-    renderRiver(state);
-    renderGrid(state);
-    renderTianji(state);
-    renderBattleData(state);
-  }
-
   /* ---------------- 调试面板 ---------------- */
   function debugContent(tab, state) {
     var box = document.createElement('div');
     box.className = 'debug-content';
+    var GS = g.DSH_GameState;
 
     switch (tab) {
       case '战斗日志': {
@@ -261,32 +261,42 @@
         box.appendChild(list);
         break;
       }
-      case '卡池': {
+      case '卡包': {
         var table = el('table', 'dbg-table');
-        table.innerHTML = '<tr><th>英雄</th><th>兵种</th><th>五行</th><th>攻</th><th>防</th><th>状态</th></tr>';
-        g.DSH_GameState.aliveHeroes(state).concat(
-          g.DSH_HEROES.HEROES.filter(function (h) { return g.DSH_GameState.getHero(state, h.id).hp <= 0; })
-            .map(function (h) { return g.DSH_GameState.getHero(state, h.id); })
-        ).forEach(function (h) {
-          var tr = el('tr', h.hp <= 0 ? 'dead-row' : '');
-          tr.innerHTML = '<td>' + h.nick + '</td><td>' + h.role + '</td><td>' + h.element +
-            '</td><td>' + h.atk + '</td><td>' + h.hp + '/' + h.maxHp + '</td><td>' +
-            (h.hp <= 0 ? '已退场' : '存活') + '</td>';
+        table.innerHTML = '<tr><th>英雄</th><th>类别</th><th>五行</th><th>指向</th><th>效果</th><th>手牌</th></tr>';
+        g.DSH_HEROES.packHeroIds(state.commander ? state.commander.heroId : null).forEach(function (id) {
+          var h = g.DSH_HEROES.byId(id);
+          var inHand = GS.countHeroInHand(state, id);
+          var copies = state.pack.filter(function (c) { return c.heroId === id; }).length;
+          var tr = el('tr', '');
+          tr.innerHTML = '<td>' + h.nick + '</td><td>' + h.category + '</td><td>' + h.element +
+            '</td><td>' + (g.DSH_CardRenderer.TARGET_TEXT[h.target] || '') + '</td><td>' + h.desc +
+            '</td><td>' + inHand + '/' + copies + '</td>';
           table.appendChild(tr);
         });
         box.appendChild(table);
         break;
       }
+      case '主将': {
+        var cmd = state.commander;
+        var cd = g.DSH_HEROES.byId(cmd.heroId);
+        box.appendChild(el('p', '', '主将：' + cd.nick + '（' + cd.name + '）· ' + cd.category + ' · ' + cd.element));
+        box.appendChild(el('p', '', '血量：' + cmd.hp + '/' + cmd.maxHp + '　防御：' + cmd.defense));
+        box.appendChild(el('p', '', '主将天赋：『' + cd.talent.name + '』 ' + cd.talent.desc));
+        box.appendChild(el('p', 'dbg-note', '主将没有攻击，是「你」；偏将卡才是招式。'));
+        break;
+      }
       case '规则': {
         var hex = state.currentHexagram;
-        box.appendChild(el('p', '', '当前卦象：『' + (hex ? hex.name : '-') + '』 生效规则：'));
+        box.appendChild(el('p', '', '当前卦象：『' + (hex ? hex.name : '-') + '』（' +
+          g.DSH_HexSystem.hexProgressText(state) + '）'));
         var ul = el('ul', '');
         if (hex) hex.rules.forEach(function (r) {
           var t = g.DSH_HEX64.RULE_TEXT[r.key];
           ul.appendChild(el('li', '', (t ? t.name : r.key) + '：' + (t ? t.text.replace('X', r.value) : r.value)));
         });
         box.appendChild(ul);
-        box.appendChild(el('p', 'dbg-note', '—— 规则库（24 种，全部实现）——'));
+        box.appendChild(el('p', 'dbg-note', '—— 规则库（25 种，全部实现）——'));
         var ul2 = el('ul', 'rule-lib');
         for (var k in g.DSH_HEX64.RULE_TEXT) {
           var t2 = g.DSH_HEX64.RULE_TEXT[k];
@@ -297,14 +307,12 @@
       }
       case '英雄名录': {
         var t3 = el('table', 'dbg-table');
-        t3.innerHTML = '<tr><th>id</th><th>诨名</th><th>名字</th><th>兵种</th><th>五行</th><th>阴阳</th><th>攻/防</th><th>特技</th><th>皮肤</th></tr>';
+        t3.innerHTML = '<tr><th>诨名</th><th>名字</th><th>类别</th><th>五行</th><th>指向</th><th>效果</th><th>主将天赋</th><th>主将血</th></tr>';
         g.DSH_HEROES.HEROES.forEach(function (h) {
           var tr = el('tr', '');
-          var skins = h.skins.map(function (s) { return s.name; }).join(' / ');
-          tr.innerHTML = '<td>' + h.id + '</td><td>' + h.nick + '</td><td>' + h.name + '</td><td>' +
-            h.role + '</td><td>' + h.element + '</td><td>' + h.yinYang + '</td><td>' +
-            h.atk + '/' + h.hp + '</td><td>' + h.skillName + '(x' + h.skillMult + ')</td><td>' +
-            skins + '</td>';
+          tr.innerHTML = '<td>' + h.nick + '</td><td>' + h.name + '</td><td>' + h.category + '</td><td>' +
+            h.element + '</td><td>' + (g.DSH_CardRenderer.TARGET_TEXT[h.target] || '') + '</td><td>' +
+            h.desc + '</td><td>' + h.talent.name + '</td><td>' + h.hp + '</td>';
           t3.appendChild(tr);
         });
         box.appendChild(t3);
@@ -321,8 +329,7 @@
           var tr = el('tr', '');
           tr.innerHTML = '<th>' + att + '</th>';
           ring.forEach(function (def) {
-            var m = g.DSH_ELEMENTS.counterMult(att, def);
-            tr.innerHTML += '<td>' + m + '</td>';
+            tr.innerHTML += '<td>' + g.DSH_ELEMENTS.counterMult(att, def) + '</td>';
           });
           t4.appendChild(tr);
         });
@@ -358,7 +365,6 @@
     return box;
   }
 
-  /** 渲染调试面板 Tab 条 */
   function renderTabs(active) {
     var bar = document.getElementById('debug-tabs');
     if (!bar) return;
@@ -376,8 +382,9 @@
     renderAll: renderAll,
     renderEnemyRow: renderEnemyRow,
     renderRiver: renderRiver,
+    renderHand: renderHand,
+    renderCommander: renderCommander,
     renderTianji: renderTianji,
-    renderGrid: renderGrid,
     renderEnemyInfo: renderEnemyInfo,
     renderEnemyTargets: renderEnemyTargets,
     debugContent: debugContent,

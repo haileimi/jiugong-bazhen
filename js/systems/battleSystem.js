@@ -1,257 +1,388 @@
 /**
- * battleSystem.js — 战斗（天机耗卡攻击、魔王出牌、伤害结算、胜负判定）
+ * battleSystem.js — 战斗（v3：打出招式卡 / 怪物打主将 / 伤害结算 / 胜负判定）
  *
- * 伤害公式：伤害 = max(2, round(攻击 × 克制系数 × 暴击倍率 × 兵种特技倍率)) + 连击增伤
+ * 打出卡牌（均耗 1 天机，用完回卡包）：
+ *   战斗·单体：点卡 → 点怪物 → 造成伤害（五行克制 × 特技 × 主将天赋）
+ *   战斗·全体：点卡直接打出，对全体敌人造成伤害
+ *   护卫·自身：点卡直接打出，获得防御 / 恢复血量
+ *   护卫·单体：点卡 → 点怪物 → 敌方攻击 -30%（可叠加至 60%）+ 恢复血量
+ *   计谋·自身：点卡直接打出（天机上限 +1 并抽牌 / 手牌抽满至 10）
+ *   计谋·单体：点卡 → 点怪物 → 敌方攻击 -20% + 风蚀
+ *
+ * 伤害公式：伤害 = max(2, round(攻击 × 克制系数 × 特技倍率 × 暴击倍率)) + 连击增伤
  * 暴击：10% 基础概率，×1.5
- * 护盾优先吸收伤害，溢出扣血量；血量归零即退场。
  */
 (function (g) {
   'use strict';
 
+  var GS = function () { return g.DSH_GameState; };
   var BASE_CRIT = 0.10;
   var CRIT_MULT = 1.5;
+  var ATK_DEBUFF_CAP = 60;
 
-  /**
-   * 纯伤害公式：伤害 = max(2, round(攻击 × 倍率 × 暴击倍率)) + 连击增伤
-   * （供自检与战斗共用）
-   */
-  function calcDamage(atk, mult, crit, bonus) {
-    return Math.max(2, Math.round(atk * mult * (crit ? CRIT_MULT : 1))) + (bonus || 0);
+  /** 纯伤害公式（供自检与战斗共用） */
+  function calcDamage(atk, mult, crit, critMult, bonus) {
+    var cm = crit ? (critMult || CRIT_MULT) : 1;
+    return Math.max(2, Math.round(atk * mult * cm)) + (bonus || 0);
   }
 
+  /* ---------------- 打出卡牌 ---------------- */
+
   /**
-   * 英雄拖动攻击：slot 上的英雄攻击敌方单位。
-   * @returns {object|null} {damage, crit, skill, killed, hexName} 或 null(未执行)
+   * 打出卡牌。
+   * @param {number} enemyId 单体指向时的目标；全体/自身可空
+   * @returns {object|null} {kind, damage, killed, ...} 或 null（未执行）
    */
-  function attackHeroToEnemy(state, events, slot, enemyId) {
-    var GS = g.DSH_GameState;
-    if (state.phase !== 'player') { GS.pushLog(state, '当前不是玩家回合'); return null; }
-    if (state.tianji <= 0) { GS.pushLog(state, '天机不足，本回合无法再出卡'); return null; }
+  function playCard(state, events, uid, enemyId) {
+    if (state.phase !== 'player') { GS().pushLog(state, '当前不是玩家回合'); return null; }
+    if (state.over) return null;
+    var card = GS().getCard(state, uid);
+    if (!card || !GS().cardInHand(state, uid)) { GS().pushLog(state, '该牌不在手牌中'); return null; }
+    if (state.tianji <= 0 && !state.freeChase[uid]) { GS().pushLog(state, '天机不足，无法出牌'); return null; }
 
-    var hero = state.board[slot] ? GS.getHero(state, state.board[slot]) : null;
-    if (!hero || hero.hp <= 0) { GS.pushLog(state, '该位置没有可用英雄'); return null; }
-    if (state.usedThisTurn[hero.id]) { GS.pushLog(state, hero.name + ' 本回合已行动'); return null; }
+    var hero = GS().cardDef(state, uid);
+    if (!hero) return null;
 
-    var target = GS.getEnemy(state, enemyId);
-    if (!target || !target.alive || target.hp <= 0) { GS.pushLog(state, '目标已阵亡'); return null; }
-    if (enemyId === state.boss.id && !GS.bossUnlocked(state)) { GS.pushLog(state, '魔王本体仍在守护中，无法攻击'); return null; }
+    // 单体指向必须给目标；全体/自身不需要
+    if (hero.target === 'single' && !enemyId) { GS().pushLog(state, '请选择目标怪物'); return null; }
+    if (hero.target === 'single') {
+      var t = GS().getEnemy(state, enemyId);
+      if (!t || !t.alive || t.hp <= 0) { GS().pushLog(state, '目标已阵亡'); return null; }
+      if (state.boss && enemyId === state.boss.id && !GS().bossUnlocked(state)) {
+        GS().pushLog(state, '魔王本体仍在守护中，无法攻击'); return null;
+      }
+    }
+
+    // 打出即从手牌移除（用完回卡包）；追击时重新放回
+    state.hand = state.hand.filter(function (u) { return u !== uid; });
+
+    var result;
+    if (hero.category === '战斗') result = attackWith(state, events, card, hero, enemyId);
+    else if (hero.category === '护卫') result = guardWith(state, events, card, hero, enemyId);
+    else result = schemeWith(state, events, card, hero, enemyId);
+    if (!result) {
+      state.hand.push(uid); // 未执行：放回手牌
+      return null;
+    }
+
+    // 追击（赵星）：卡留手牌、本击不耗天机、可再打
+    if (result.chased) {
+      state.hand.push(uid);
+      state.usedThisTurn[uid] = false;
+      GS().pushLog(state, '⚡ 追击！' + hero.nick + ' 不耗天机再打一次');
+      return result;
+    }
+
+    state.usedThisTurn[uid] = true;
+    if (!state.freeChase[uid]) state.tianji -= 1;
+    delete state.freeChase[uid];
+
+    GS().pushLog(state, '打出『' + hero.nick + '·' + hero.name + '』（' + hero.category + '）' +
+      (result.damage ? '，造成 ' + result.damage + ' 伤害' : ''));
+    checkWin(state, events);
+    return result;
+  }
+
+  /* ---------------- 战斗牌 ---------------- */
+
+  function attackWith(state, events, card, hero, enemyId) {
+    var payload = {
+      state: state, attacker: { kind: 'card', uid: card.uid, heroId: hero.id, element: hero.element },
+      target: enemyId ? GS().getEnemy(state, enemyId) : null,
+      mult: 1, crit: false, bonus: 0
+    };
+    events.emit('beforeAttack', payload);
+
+    // 主将天赋加成 + 层 buff
+    var talent = GS().commanderDef(state).talent;
+    if (talent && talent.type === 'battlePct') payload.mult *= (100 + talent.value) / 100;
+    if (hero.target === 'all' && talent && talent.type === 'aoePct') payload.mult *= (100 + talent.value) / 100;
+    if ((state.runBuffs.battlePct || 0) > 0) payload.mult *= (100 + state.runBuffs.battlePct) / 100;
+    if (!state.firstCardPlayedThisTurn) {
+      if (talent && talent.type === 'firstCardBonus') payload.bonus += talent.value;
+      state.firstCardPlayedThisTurn = true;
+    }
+
+    var dmg = 0;
+    var skill = null;
+    var killed = false;
+    var last = null;
+
+    function hitOne(enemy) {
+      var crit = payload.crit;
+      if (!crit && state.rnd() < (BASE_CRIT + (talent && talent.type === 'critRate' ? talent.value / 100 : 0))) crit = true;
+      var critMult = CRIT_MULT + (talent && talent.type === 'critDmg' ? talent.value / 100 : 0);
+      var mult = payload.mult * g.DSH_ELEMENTS.counterMult(hero.element, enemy.element);
+      var bonus = payload.bonus;
+
+      // 特技
+      if (hero.skill && state.rnd() < (hero.skill.chance || 0)) {
+        skill = hero.skill;
+        if (skill.mult) mult *= skill.mult;
+        if (skill.critDmg) { crit = true; critMult = skill.critDmg + (talent && talent.type === 'critDmg' ? talent.value / 100 : 0); }
+      }
+
+      var damage = calcDamage(hero.damage, mult, crit, critMult, bonus);
+
+      // 受击事件（敌方侧规则）
+      var td = { state: state, victim: enemy, attacker: payload.attacker, amount: damage };
+      events.emit('takeDamage', td);
+      damage = Math.max(1, Math.round(td.amount));
+
+      enemy.hp -= damage;
+      var k = enemy.hp <= 0;
+      if (k) { enemy.hp = 0; enemy.alive = false; }
+      state.lastHits.push({ kind: 'enemy', id: enemy.id, amount: damage });
+
+      // 特技附加
+      if (skill && skill.burn) state.burnStacks[enemy.id] = (state.burnStacks[enemy.id] || 0) + skill.burn;
+      if (skill && skill.windAll) state.windBurnLayers[enemy.id] = (state.windBurnLayers[enemy.id] || 0) + skill.windAll;
+      if (skill && skill.freeze && enemy.alive) state.frozenNext[enemy.id] = true;
+
+      var ap = { state: state, attacker: payload.attacker, target: enemy, damage: damage, killed: k };
+      events.emit('afterAttack', ap);
+      if (k) {
+        var dp = { state: state, victim: enemy, cause: 'card-attack', prevent: false };
+        events.emit('death', dp);
+      }
+      dmg += damage;
+      killed = killed || k;
+      last = { id: enemy.id, damage: damage, killed: k };
+      GS().pushLog(state, hero.nick + ' 攻击 ' + enemy.name + (crit ? '【暴击】' : '') +
+        (skill ? '【' + skill.name + '】' : '') + ' 造成 ' + damage + ' 伤害' + (k ? '，被击败！' : ''));
+    }
+
+    if (hero.target === 'all') {
+      GS().aliveEnemies(state).forEach(hitOne);
+    } else {
+      hitOne(payload.target);
+    }
 
     state.stats.attackCountThisTurn += 1;
     state.stats.consecutiveAttacks += 1;
 
-    // 规则前置（可改 mult/crit/bonus）
-    var payload = { state: state, attacker: hero, target: target, mult: 1, crit: false, bonus: 0 };
-    events.emit('beforeAttack', payload);
+    // 追击：单体会话中特技已掷骰，直接沿用该次结果
+    var chased = !!(skill && skill.chase);
 
-    var crit = payload.crit;
-    if (!crit && state.rnd() < BASE_CRIT) crit = true;
-    var mult = payload.mult;
+    return { kind: 'attack', damage: dmg, killed: killed, skill: skill, chased: chased, last: last };
+  }
 
-    // 五行克制
-    mult *= g.DSH_ELEMENTS.counterMult(hero.element, target.element);
+  /* ---------------- 护卫牌 ---------------- */
 
-    // 兵种特技（25%）
-    var skill = false;
-    if (state.rnd() < hero.skillChance) { mult *= hero.skillMult; skill = true; }
-
-    var dmg = calcDamage(hero.atk, mult, crit, payload.bonus);
-
-    // 受击事件（敌方侧规则）
-    var td = { state: state, victim: target, attacker: hero, amount: dmg };
-    events.emit('takeDamage', td);
-    dmg = Math.max(1, Math.round(td.amount));
-
-    target.hp -= dmg;
-    var killed = target.hp <= 0;
-    if (killed) { target.hp = 0; target.alive = false; }
-
-    // 受击记录（渲染层标红抖动）
-    state.lastHits.push({ kind: 'enemy', id: target.id, amount: dmg });
-
-    state.tianji -= 1;
-    state.usedThisTurn[hero.id] = true;
-
-    var ap = { state: state, attacker: hero, target: target, damage: dmg, killed: killed };
-    events.emit('afterAttack', ap);
-
-    GS.pushLog(state, hero.nick + '(' + hero.name + ') 攻击 ' + target.name +
-      (crit ? '【暴击】' : '') + (skill ? '【' + hero.skillName + '】' : '') +
-      ' 造成 ' + dmg + ' 伤害' + (killed ? '，' + target.name + ' 被击败！' : ''));
-
-    if (killed) {
-      var dp = { state: state, victim: target, cause: 'hero-attack', prevent: false };
-      events.emit('death', dp);
-      if (target.id === state.boss.id) { /* 本体死亡，由胜负判定处理 */ }
-      checkWin(state, events);
+  function guardWith(state, events, card, hero, enemyId) {
+    var talent = GS().commanderDef(state).talent;
+    if (hero.target === 'single') {
+      // 闷嘴石：敌方攻击 -30%（可叠加至 60%）+ 恢复 3 血量
+      var e = GS().getEnemy(state, enemyId);
+      var cur = state.atkDebuff[e.id] || 0;
+      state.atkDebuff[e.id] = Math.min(ATK_DEBUFF_CAP, cur + hero.atkDown);
+      GS().pushLog(state, '🛡 ' + hero.nick + ' 削弱 ' + e.name + ' 攻击 -' + hero.atkDown + '%（当前 -' + state.atkDebuff[e.id] + '%）');
+      var h = healCommander(state, hero.heal);
+      GS().pushLog(state, '♨ 恢复 ' + h + ' 点血量');
+      return { kind: 'guard', heal: h };
     }
-
-    return { damage: dmg, crit: crit, skill: skill, killed: killed,
-             hexName: state.currentHexagram ? state.currentHexagram.name : '' };
-  }
-
-  /** 对单个敌方单位造成伤害（规则/灼烧等通用入口，可致死） */
-  function damageEnemy(state, enemyId, amount, source) {
-    var GS = g.DSH_GameState;
-    var e = GS.getEnemy(state, enemyId);
-    if (!e || !e.alive || e.hp <= 0) return false;
-    e.hp -= amount;
-    if (e.hp <= 0) {
-      e.hp = 0;
-      e.alive = false;
-      GS.pushLog(state, (source ? source + '：' : '') + e.name + ' 被击败！');
-      checkWin(state);
-      return true;
+    // 自身：获得防御 + 恢复血量
+    if (hero.defGain > 0) {
+      state.commander.defense += hero.defGain;
+      GS().pushLog(state, '🛡 获得 ' + hero.defGain + ' 点防御（当前 ' + state.commander.defense + '）');
     }
-    return false;
+    var healed = hero.heal > 0 ? healCommander(state, hero.heal) : 0;
+    return { kind: 'guard', defense: hero.defGain, heal: healed };
   }
 
-  /** 对所有存活敌方（含本体）造成伤害 */
-  function damageAllEnemies(state, amount, source) {
-    var GS = g.DSH_GameState;
-    var targets = GS.aliveEnemies(state);
-    targets.forEach(function (e) { damageEnemy(state, e.id, amount, source); });
+  /* ---------------- 计谋牌 ---------------- */
+
+  function schemeWith(state, events, card, hero, enemyId) {
+    if (hero.fillHand) {
+      // 白泽：手牌抽满至 10 张
+      var want = GS().HAND_MAX - state.hand.length;
+      if (want > 0) {
+        var cards = g.DSH_TurnSystem.drawFromPack(state, want);
+        state.hand = state.hand.concat(cards);
+        GS().pushLog(state, '🃏 白泽显灵：手牌抽满至 ' + state.hand.length + ' 张');
+      } else {
+        GS().pushLog(state, '🃏 白泽显灵：手牌已满');
+      }
+      return { kind: 'scheme', draw: want };
+    }
+    if (hero.draw > 0) {
+      var cards2 = g.DSH_TurnSystem.drawFromPack(state, hero.draw);
+      state.hand = state.hand.concat(cards2);
+      GS().pushLog(state, '🃏 抽 ' + cards2.length + ' 张');
+    }
+    if (hero.tianjiUp && !state.tianjiUpApplied) {
+      state.tianjiUpApplied = true;
+      state.maxTianji = g.DSH_TurnSystem.maxTianji(state);
+      state.tianji += 1;
+      GS().pushLog(state, '✦ 本场战斗天机上限 +1（' + state.maxTianji + '），并回复 1 点天机');
+    }
+    if (hero.atkDown > 0 && enemyId) {
+      var e = GS().getEnemy(state, enemyId);
+      var cur = state.atkDebuff[e.id] || 0;
+      state.atkDebuff[e.id] = Math.min(ATK_DEBUFF_CAP, cur + hero.atkDown);
+      state.windBurnLayers[e.id] = (state.windBurnLayers[e.id] || 0) + (hero.wind || 0);
+      GS().pushLog(state, '🌀 ' + hero.nick + ' 削弱 ' + e.name + ' 攻击 -' + hero.atkDown + '%，附加 ' + (hero.wind || 0) + ' 层风蚀');
+    }
+    return { kind: 'scheme' };
   }
 
-  /** 对英雄造成伤害：护盾优先吸收；触发 takeDamage 规则；死亡事件 */
-  function damageHero(state, events, hero, amount, attacker) {
-    var GS = g.DSH_GameState;
-    if (hero.hp <= 0) return false;
+  /* ---------------- 主将受击 ---------------- */
 
-    var td = { state: state, victim: hero, attacker: attacker, amount: amount };
+  function healCommander(state, amount) {
+    if (!state.commander || amount <= 0) return 0;
+    var real = Math.min(state.commander.maxHp - state.commander.hp, Math.round(amount));
+    state.commander.hp += real;
+    if (real > 0) state.lastHits.push({ kind: 'commander-heal', amount: real });
+    return real;
+  }
+
+  /**
+   * 主将受击：规则减伤 → 主将天赋减伤 → 防御吸收 → 扣血（免死天赋/复活规则）
+   */
+  function damageCommander(state, events, amount, attacker) {
+    if (!GS().commanderAlive(state)) return false;
+    var td = { state: state, victim: state.commander, attacker: attacker, amount: amount };
     events.emit('takeDamage', td);
     var dmg = Math.max(0, Math.round(td.amount));
 
-    // 护盾吸收
+    var talent = GS().commanderDef(state).talent;
+    if (talent && talent.type === 'dmgReduce') dmg = Math.round(dmg * (100 - talent.value) / 100);
+    dmg = Math.round(dmg * (100 - (state.runBuffs.defPct || 0)) / 100);
+
     var absorbed = 0;
-    var shield = state.shield[hero.id] || 0;
-    if (shield > 0) {
-      absorbed = Math.min(shield, dmg);
-      shield -= absorbed;
-      state.shield[hero.id] = shield;
+    if (state.commander.defense > 0) {
+      absorbed = Math.min(state.commander.defense, dmg);
+      state.commander.defense -= absorbed;
       dmg -= absorbed;
     }
+    state.commander.hp -= dmg;
+    if (absorbed + dmg > 0) state.lastHits.push({ kind: 'commander', amount: absorbed + dmg });
 
-    hero.hp -= dmg;
-    // 受击记录（渲染层标红抖动）
-    if (absorbed + dmg > 0) state.lastHits.push({ kind: 'hero', id: hero.id, amount: absorbed + dmg });
-    if (hero.hp <= 0) {
-      hero.hp = 0;
-      var dp = { state: state, victim: hero, cause: 'enemy-attack', prevent: false };
+    if (state.commander.hp <= 0) {
+      // 希寒川主将天赋：每场战斗免死一次
+      if (talent && talent.type === 'onceSave' && !state.stats.onceSaveUsed) {
+        state.stats.onceSaveUsed = true;
+        state.commander.hp = 1;
+        GS().pushLog(state, '☯ 主将天赋『' + talent.name + '』：死里逃生，保留 1 点血量！');
+        return false;
+      }
+      var dp = { state: state, victim: state.commander, cause: 'enemy-attack', prevent: false };
       events.emit('death', dp);
       if (dp.prevent) return false; // 复活
-      // 从桌面移除；血量保留（0），永久退出牌库
-      for (var i = 0; i < state.board.length; i++) {
-        if (state.board[i] === hero.id) state.board[i] = null;
-      }
-      GS.pushLog(state, hero.nick + '(' + hero.name + ') 战死退场！');
+      state.commander.hp = 0;
+      GS().pushLog(state, '💀 主将 ' + state.commander.heroId + ' 战死！');
+      state.over = 'lose';
+      state.phase = 'over';
       return true;
     }
     return false;
   }
 
-  /** 魔王回合：最多 4 次行动（4 天机），魔将按牌序循环（跳过阵亡），全灭后本体 */
+  /* ---------------- 敌方回合 ---------------- */
+
+  /** 怪物行动：存活单位轮流攻击主将（上限 4 次） */
   function bossActPhase(state, events) {
-    var GS = g.DSH_GameState;
     state.phase = 'boss';
     var cursor = 0;
     var acted = 0;
-    var maxActions = 4;
+    var alive = GS().aliveEnemies(state);
+    var maxActions = Math.min(4, alive.length);
+    if (maxActions <= 0) { state.phase = 'player'; return 0; }
 
     for (var i = 0; i < maxActions; i++) {
-      // 找下一个存活魔将（循环），全灭则本体
       var attacker = null;
       for (var n = 0; n < state.enemies.length; n++) {
         var e = state.enemies[cursor % state.enemies.length];
         cursor++;
         if (e.alive && e.hp > 0) { attacker = e; break; }
       }
-      if (!attacker) attacker = state.boss;
+      if (!attacker && state.boss && state.boss.alive && state.boss.hp > 0) attacker = state.boss;
+      if (!attacker) break;
 
-      // 冻结判定（冻结跳过本次行动）
-      if (state.frozenNext[attacker.id]) {
-        delete state.frozenNext[attacker.id];
-        GS.pushLog(state, attacker.name + ' 被冻结，跳过行动！');
-        acted++;
-        continue;
-      }
-      if (state.frozen[attacker.id]) {
-        delete state.frozen[attacker.id];
-        acted++;
-        continue;
-      }
+      if (state.frozenNext[attacker.id]) { delete state.frozenNext[attacker.id]; acted++; continue; }
+      if (state.frozen[attacker.id]) { delete state.frozen[attacker.id]; acted++; continue; }
 
-      // 目标：全体攻击 = 所有桌面英雄；单体 = 随机一名
-      var boardHeroes = GS.boardHeroes(state);
-      if (boardHeroes.length === 0) break;
-
-      var base = attacker.atk;
-      var bp = { state: state, attacker: attacker, targets: boardHeroes.map(function (b) { return b.hero; }), amount: base };
+      var base = GS().enemyAtk(state, attacker);
+      base = Math.round(base * (100 + (state.runBuffs.enemyAtkPct || 0)) / 100);
+      var bp = { state: state, attacker: attacker, targets: [state.commander], amount: base };
       events.emit('bossAct', bp);
       var amount = Math.max(0, Math.floor(bp.amount));
 
-      if (attacker.aoe) {
-        boardHeroes.forEach(function (b) {
-          GS.pushLog(state, attacker.name + '【全体攻击】对 ' + b.hero.name + ' 造成 ' + amount + ' 伤害');
-          damageHero(state, events, b.hero, amount, attacker);
-        });
-      } else {
-        var victim = boardHeroes[Math.floor(state.rnd() * boardHeroes.length)].hero;
-        GS.pushLog(state, attacker.name + ' 攻击 ' + victim.name + '，造成 ' + amount + ' 伤害');
-        damageHero(state, events, victim, amount, attacker);
-      }
+      GS().pushLog(state, attacker.name + ' 攻击主将，造成 ' + amount + ' 伤害' +
+        (attacker.aoe ? '【全体】' : ''));
+      damageCommander(state, events, amount, attacker);
       acted++;
+      if (state.over) break;
     }
 
-    // 胜负判定（我方全灭）
-    if (GS.aliveHeroes(state).length === 0 && !state.over) {
-      state.over = 'lose';
-      state.phase = 'over';
-    }
+    if (!state.over) state.phase = 'player';
     return acted;
   }
 
-  /** 回合结算：燃烧/风蚀持续伤害 + 胜负判定 */
+  /* ---------------- 持续伤害 / 胜负 ---------------- */
+
   function applyDot(state, events) {
-    var GS = g.DSH_GameState;
-    var enemies = GS.aliveEnemies(state);
-    enemies.forEach(function (e) {
+    GS().aliveEnemies(state).forEach(function (e) {
       var burn = state.burnStacks[e.id] || 0;
       var wind = state.windBurnLayers[e.id] || 0;
       var dot = burn * 1 + wind * 2;
       if (dot > 0) {
-        GS.pushLog(state, e.name + ' 受到持续伤害 ' + dot + '（燃烧' + burn + '层/风蚀' + wind + '层）');
+        GS().pushLog(state, e.name + ' 受到持续伤害 ' + dot + '（燃烧' + burn + '层/风蚀' + wind + '层）');
         damageEnemy(state, e.id, dot, '持续伤害');
       }
     });
   }
 
-  /** 胜负判定：胜 = 7 魔将全灭且本体血归零；负 = 我方 12 英雄全灭 */
+  /** 对单个敌方造成伤害（通用入口） */
+  function damageEnemy(state, enemyId, amount, source) {
+    var e = GS().getEnemy(state, enemyId);
+    if (!e || !e.alive || e.hp <= 0) return false;
+    e.hp -= amount;
+    if (e.hp <= 0) {
+      e.hp = 0;
+      e.alive = false;
+      GS().pushLog(state, (source ? source + '：' : '') + e.name + ' 被击败！');
+      checkWin(state);
+      return true;
+    }
+    return false;
+  }
+
+  /** 对全体敌方造成伤害 */
+  function damageAllEnemies(state, amount, source) {
+    GS().aliveEnemies(state).forEach(function (e) { damageEnemy(state, e.id, amount, source); });
+  }
+
+  /** 胜负判定 */
   function checkWin(state) {
-    var GS = g.DSH_GameState;
     if (state.over) return;
-    if (GS.allGeneralsDead(state) && state.boss.hp <= 0) {
+    var allDead = GS().allGeneralsDead(state);
+    var bossDead = !state.boss || state.boss.hp <= 0;
+    if (allDead && bossDead) {
       state.over = 'win';
       state.phase = 'over';
-      GS.pushLog(state, '🎉 魔将全灭，混沌·六爻魔已被击败，天命降临，胜！');
+      GS().pushLog(state, '🎉 战斗胜利！');
       return;
     }
-    if (GS.aliveHeroes(state).length === 0) {
+    if (!GS().commanderAlive(state)) {
       state.over = 'lose';
       state.phase = 'over';
-      GS.pushLog(state, '💀 我方英雄全灭，败局已定……');
+      GS().pushLog(state, '💀 主将战死，败局已定……');
     }
   }
 
   g.DSH_BattleSystem = {
     BASE_CRIT: BASE_CRIT,
     CRIT_MULT: CRIT_MULT,
+    ATK_DEBUFF_CAP: ATK_DEBUFF_CAP,
     calcDamage: calcDamage,
-    attackHeroToEnemy: attackHeroToEnemy,
-    damageEnemy: damageEnemy,
-    damageAllEnemies: damageAllEnemies,
-    damageHero: damageHero,
+    playCard: playCard,
+    healCommander: healCommander,
+    damageCommander: damageCommander,
     bossActPhase: bossActPhase,
     applyDot: applyDot,
+    damageEnemy: damageEnemy,
+    damageAllEnemies: damageAllEnemies,
     checkWin: checkWin
   };
 })(typeof window !== 'undefined' ? window : globalThis);

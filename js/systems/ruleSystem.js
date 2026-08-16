@@ -1,34 +1,32 @@
 /**
- * ruleSystem.js — 卦象规则引擎（24 种规则，事件驱动）
+ * ruleSystem.js — 卦象规则引擎（24 种规则，事件驱动，v3 适配主将/招式卡）
  *
  * 事件：battleStart / turnStart / beforeAttack / afterAttack /
  *       takeDamage / death / bossAct
- * 每回合重算卦象时：events.clear() 清空全部规则监听，再按当前 64 卦规则重新注册。
+ * 第 7 回合天命觉醒后：events.clear() 清空全部规则监听，再按当前 64 卦规则重新注册。
  *
- * beforeAttack payload: { state, attacker, target, mult, crit, bonus }
- * takeDamage payload:   { state, victim, attacker, amount }  (amount 可被规则改写)
+ * beforeAttack payload: { state, attacker: 招式卡 {kind:'card',uid,heroId,element}, target: 敌方, mult, crit, bonus }
+ * takeDamage payload:   { state, victim: 主将或敌方, attacker, amount } (amount 可被规则改写)
  * death payload:        { state, victim, cause, prevent }
- * bossAct payload:      { state, attacker, targets, amount } (amount 可被规则改写)
+ * bossAct payload:      { state, attacker: 敌方, targets, amount } (amount 可被规则改写)
+ *
+ * 敌方判定：victim.alive !== undefined；主将判定：victim.heroId !== undefined 且 victim.kind !== 'card'
  */
 (function (g) {
   'use strict';
 
   var FORMAT_KEYS = { chase: 1, freezeSkill: 1, windBurn: 1, stunHit: 1, lifesteal: 1, critChance: 1, healAll: 1 };
 
+  function isEnemy(x) { return !!x && x.alive !== undefined; }
+  function isCommander(x) { return !!x && x.heroId !== undefined && x.kind !== 'card'; }
+
   /** 概率判定 */
   function chance(state, percent) { return state.rnd() * 100 < percent; }
 
-  /**
-   * 注册当前卦象的全部规则。
-   * @param {object} state  对局状态
-   * @param {DSH_EventSystem} events 事件总线
-   */
   function registerRules(state, events) {
     events.clear();
     var rules = state.currentHexagram.rules;
-    rules.forEach(function (rule) {
-      applyRule(state, events, rule);
-    });
+    rules.forEach(function (rule) { applyRule(state, events, rule); });
   }
 
   function applyRule(state, events, rule) {
@@ -40,13 +38,13 @@
         events.on('beforeAttack', function (p) { p.mult *= (100 + v) / 100; });
         break;
 
-      case 'defPct': // 全队防御 +X%（受击伤害 -X%）
+      case 'defPct': // 主将受击伤害 -X%
         events.on('takeDamage', function (p) {
-          if (p.victim.role !== undefined) p.amount *= (100 - v) / 100;
+          if (isCommander(p.victim)) p.amount *= (100 - v) / 100;
         });
         break;
 
-      case 'bossAtkDown': // 魔王攻击 -X%（向下取整）
+      case 'bossAtkDown': // 魔王攻击 -X%
         events.on('bossAct', function (p) {
           if (p.attacker) p.amount = Math.floor(p.amount * (100 - v) / 100);
         });
@@ -60,20 +58,19 @@
         });
         break;
 
-      case 'shieldAll': // 全队护盾 +X
+      case 'shieldAll': // 主将防御 +X
         events.on('turnStart', function () {
-          g.DSH_GameState.boardHeroes(state).forEach(function (b) {
-            state.shield[b.hero.id] = (state.shield[b.hero.id] || 0) + v;
-          });
+          state.commander.defense += v;
+          g.DSH_GameState.pushLog(state, '🛡 坚阵：主将防御 +' + v);
         });
         break;
 
-      case 'healAll': // 全队回复 X% 防御
+      case 'healAll': // 主将回复 X% 血量
         events.on('turnStart', function () {
-          g.DSH_GameState.boardHeroes(state).forEach(function (b) {
-            var h = b.hero;
-            h.hp = Math.min(h.maxHp, h.hp + Math.round(h.maxHp * v / 100));
-          });
+          var real = Math.min(state.commander.maxHp - state.commander.hp,
+            Math.round(state.commander.maxHp * v / 100));
+          state.commander.hp += real;
+          if (real > 0) g.DSH_GameState.pushLog(state, '♨ 回春：主将恢复 ' + real + ' 点血量');
         });
         break;
 
@@ -97,78 +94,75 @@
 
       case 'lifesteal': // 攻击吸血 X%
         events.on('afterAttack', function (p) {
-          if (p.attacker.role === undefined) return;
           var heal = Math.round(p.damage * v / 100);
-          p.attacker.hp = Math.min(p.attacker.maxHp, p.attacker.hp + heal);
+          g.DSH_BattleSystem.healCommander(state, heal);
         });
         break;
 
-      case 'dmgShield': // 受伤 X% 转护盾
+      case 'dmgShield': // 主将受伤 X% 转防御
         events.on('takeDamage', function (p) {
-          if (p.victim.role !== undefined) {
+          if (isCommander(p.victim)) {
             var s = Math.round(p.amount * v / 100);
-            if (s > 0) state.shield[p.victim.id] = (state.shield[p.victim.id] || 0) + s;
+            if (s > 0) state.commander.defense += s;
           }
         });
         break;
 
-      case 'revive': // 队伍死亡一次复活（50% 防御 + 3 盾）
+      case 'revive': // 主将死亡一次复活（50% 血量 + 3 防御）
         events.on('death', function (p) {
-          if (p.victim.role === undefined) return; // 仅英雄
-          if (state.stats.revived || p.prevent) return;
+          if (!isCommander(p.victim) || state.stats.revived || p.prevent) return;
           state.stats.revived = true;
           p.victim.hp = Math.round(p.victim.maxHp * 0.5);
-          state.shield[p.victim.id] = (state.shield[p.victim.id] || 0) + 3;
-          p.prevent = true; // 阻止死亡结算
-          g.DSH_GameState.pushLog(state, '【涅槃】' + p.victim.name + ' 死而复生！(50% 防御 + 3 盾)');
+          state.commander.defense += 3;
+          p.prevent = true;
+          g.DSH_GameState.pushLog(state, '【涅槃】主将死而复生！(50% 血量 + 3 防御)');
         });
         break;
 
       case 'freezeSkill': // X% 概率冻结敌方行动
         events.on('beforeAttack', function (p) {
-          if (chance(state, v) && p.target.role === undefined) {
+          if (chance(state, v) && isEnemy(p.target)) {
             state.frozenNext[p.target.id] = true;
-            state.stats.nextAttackCrit = true; // 配合 jiji
+            state.stats.nextAttackCrit = true;
             g.DSH_GameState.pushLog(state, '【凝滞】' + p.target.name + ' 被冻结！');
           }
         });
         break;
 
-      case 'burnOnHit': // 攻击附加燃烧层数（每层每回合 1 伤，递增）
+      case 'burnOnHit': // 攻击附加燃烧层数
         events.on('afterAttack', function (p) {
-          if (p.target.role !== undefined) return;
+          if (!isEnemy(p.target)) return;
           state.burnStacks[p.target.id] = (state.burnStacks[p.target.id] || 0) + 1;
         });
         break;
 
-      case 'windBurn': // 攻击 X% 概率附加风蚀（每层每回合 2 伤）
+      case 'windBurn': // 攻击 X% 概率附加风蚀
         events.on('afterAttack', function (p) {
-          if (p.target.role !== undefined) return;
+          if (!isEnemy(p.target)) return;
           if (chance(state, v)) state.windBurnLayers[p.target.id] = (state.windBurnLayers[p.target.id] || 0) + 1;
         });
         break;
 
       case 'chase': // 攻击 X% 概率获得额外行动（不耗天机）
         events.on('afterAttack', function (p) {
-          if (p.attacker.role === undefined) return;
           if (chance(state, v)) {
-            state.usedThisTurn[p.attacker.id] = false;
-            g.DSH_GameState.pushLog(state, '【追击】' + p.attacker.name + ' 获得额外行动！');
+            state.usedThisTurn[p.attacker.uid] = false;
+            g.DSH_GameState.pushLog(state, '【追击】' + p.attacker.heroId + ' 获得额外行动！');
           }
         });
         break;
 
-      case 'thorns': // 受击反弹 X 点伤害
+      case 'thorns': // 主将受击反弹 X 点伤害
         events.on('takeDamage', function (p) {
-          if (p.victim.role !== undefined && p.attacker && p.attacker.role === undefined) {
+          if (isCommander(p.victim) && isEnemy(p.attacker)) {
             g.DSH_BattleSystem.damageEnemy(state, p.attacker.id, v, '荆棘反伤');
           }
         });
         break;
 
-      case 'dmgReduce': // 全队受伤 -X%
+      case 'dmgReduce': // 主将受伤 -X%
         events.on('takeDamage', function (p) {
-          if (p.victim.role !== undefined) p.amount *= (100 - v) / 100;
+          if (isCommander(p.victim)) p.amount *= (100 - v) / 100;
         });
         break;
 
@@ -180,7 +174,7 @@
 
       case 'stunHit': // 攻击 X% 概率冻结敌方下次行动
         events.on('beforeAttack', function (p) {
-          if (chance(state, v) && p.target.role === undefined) {
+          if (chance(state, v) && isEnemy(p.target)) {
             state.frozenNext[p.target.id] = true;
             state.stats.nextAttackCrit = true;
             g.DSH_GameState.pushLog(state, '【破势】' + p.target.name + ' 下次行动被冻结！');
@@ -188,26 +182,24 @@
         });
         break;
 
-      case 'healOnHit': // 攻击回复 X 点防御
+      case 'healOnHit': // 攻击回复 X 点血量
         events.on('afterAttack', function (p) {
-          if (p.attacker.role === undefined) return;
-          p.attacker.hp = Math.min(p.attacker.maxHp, p.attacker.hp + v);
+          g.DSH_BattleSystem.healCommander(state, v);
         });
         break;
 
-      case 'empowNext': // 连击增伤（每次攻击后下次 +1）
+      case 'empowNext': // 连击增伤
         events.on('beforeAttack', function (p) { p.bonus += state.stats.comboBonus; });
         events.on('afterAttack', function () { state.stats.comboBonus += 1; });
         break;
 
       case 'qiantian': // 连续三次攻击后获得额外行动
         events.on('afterAttack', function (p) {
-          if (p.attacker.role === undefined) return;
           state.stats.consecutiveAttacks += 1;
           if (state.stats.consecutiveAttacks >= 3) {
             state.stats.consecutiveAttacks = 0;
-            state.usedThisTurn[p.attacker.id] = false;
-            g.DSH_GameState.pushLog(state, '【乾天】' + p.attacker.name + ' 三连后获得额外行动！');
+            state.usedThisTurn[p.attacker.uid] = false;
+            g.DSH_GameState.pushLog(state, '【乾天】三连后获得额外行动！');
           }
         });
         break;
@@ -218,10 +210,10 @@
         });
         break;
 
-      case 'weiji': // 攻击增加，但受到伤害增加
+      case 'weiji': // 攻击增加，但主将受到伤害增加
         events.on('beforeAttack', function (p) { p.mult *= (100 + v) / 100; });
         events.on('takeDamage', function (p) {
-          if (p.victim.role !== undefined) p.amount *= (100 + v) / 100;
+          if (isCommander(p.victim)) p.amount *= (100 + v) / 100;
         });
         break;
 

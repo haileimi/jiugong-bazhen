@@ -16,6 +16,7 @@ const files = [
   'js/data/hex64.js',
   'js/core/eventSystem.js',
   'js/core/gameState.js',
+  'js/core/saveSystem.js',
   'js/core/turnSystem.js',
   'js/systems/hexSystem.js',
   'js/systems/ruleSystem.js',

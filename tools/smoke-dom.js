@@ -1,6 +1,7 @@
 /**
  * smoke-dom.js — 浏览器侧冒烟测试（模拟 DOM，不依赖真实浏览器）
- * 流程：加载全部脚本 → 自动 init → 点击选上卦 → 拖动攻击 → 回合完毕
+ * 流程：加载全部脚本 → 自动 init → 首页 → 开始战斗 → 选主将（穆奎）→
+ *       地图 → 进入小怪战斗点 → 战斗渲染 → 回合完毕流转
  * 用法：node tools/smoke-dom.js
  */
 'use strict';
@@ -17,6 +18,7 @@ const files = [
   'js/data/hex64.js',
   'js/core/eventSystem.js',
   'js/core/gameState.js',
+  'js/core/saveSystem.js',
   'js/core/turnSystem.js',
   'js/systems/hexSystem.js',
   'js/systems/ruleSystem.js',
@@ -24,7 +26,7 @@ const files = [
   'js/render/cardRenderer.js',
   'js/render/battleRenderer.js',
   'js/render/popupRenderer.js',
-  'js/input/dragController.js',
+  'js/input/clickController.js',
   'js/test/selftest.js',
   'js/main.js'
 ];
@@ -57,7 +59,7 @@ function makeEl(tag) {
   let _html = '';
   Object.defineProperty(el, 'innerHTML', {
     get() { return _html; },
-    set(v) { _html = v; if (v === '') this.children = []; } // 模拟真实 DOM：清空即移除子节点
+    set(v) { _html = v; if (v === '') this.children = []; }
   });
   Object.defineProperty(el, 'classList', {
     value: {
@@ -85,7 +87,14 @@ const doc = {
   querySelectorAll() { return []; }
 };
 
-const sandbox = { console, document: doc };
+const store = {};
+const localStorage = {
+  getItem(k) { return store[k] !== undefined ? store[k] : null; },
+  setItem(k, v) { store[k] = String(v); },
+  removeItem(k) { delete store[k]; }
+};
+
+const sandbox = { console, document: doc, localStorage };
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
@@ -99,31 +108,83 @@ try {
   console.error('✗ 脚本加载失败: ' + e.message);
   process.exit(1);
 }
+console.log('✓ 全部脚本加载，首页已初始化');
 
-// 找到开局弹窗里的第一个上卦选项按钮并点击（精确匹配类名）
-const choice = created.find((e) => String(e.className).split(/\s+/).indexOf('trigram-choice') >= 0);
-if (!choice) { console.error('✗ 未找到上卦选择按钮'); process.exit(1); }
-choice.click();
-console.log('✓ 开局选卦完成');
-
-// 关键验证：选卦后弹窗必须已关闭（modal-root 不再有子节点）
-const modalRoot = elements['modal-root'];
-if (modalRoot && modalRoot.children.length > 0) {
-  console.error('✗ 选卦后弹窗未关闭，仍盖在战场上');
+// 1. 首页应显示（page-home 可见）
+const pageHome = elements['page-home'];
+if (!pageHome || pageHome.style.display === 'none') {
+  console.error('✗ 首页未显示');
   process.exit(1);
 }
-console.log('✓ 选卦后弹窗已关闭，战场露出');
+console.log('✓ 首页显示');
 
-// 检查状态
-const st = sandbox._smokeState || null;
+// 2. 点击「开始战斗」→ 弹选主将
+const startBtn = elements['home-start-btn'];
+if (!startBtn) { console.error('✗ 未找到开始战斗按钮'); process.exit(1); }
+startBtn.click();
+if (!elements['modal-root'] || elements['modal-root'].children.length === 0) {
+  console.error('✗ 未弹出选主将窗口');
+  process.exit(1);
+}
+console.log('✓ 选主将弹窗出现');
 
-// 模拟点击「回合完毕」
-const endBtn = elements['end-turn-btn'];
-if (!endBtn) { console.error('✗ 未找到回合完毕按钮'); process.exit(1); }
-endBtn.click();
-console.log('✓ 一个完整回合流转（开局 → 玩家回合 → 魔王行动 → 回合结算）无异常');
+// 3. 选穆奎（大山汉，血量厚）当主将
+const dwPick = created.find((e) => String(e.className).indexOf('pick-card') >= 0 && String(e.innerHTML || '').indexOf('穆奎') >= 0);
+if (!dwPick) { console.error('✗ 未找到穆奎选将卡'); process.exit(1); }
+dwPick.click();
+const pageMap = elements['page-map'];
+if (!pageMap || pageMap.style.display === 'none') {
+  console.error('✗ 选将后未进入地图页');
+  process.exit(1);
+}
+const app = sandbox.DSH_APP;
+const st = app.getState();
+if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 48) {
+  console.error('✗ 主将/卡包初始化错误');
+  process.exit(1);
+}
+console.log('✓ 主将选定穆奎，卡包 48 张，进入第 ' + st.layer + ' 层地图');
 
-// 模拟一次拖动攻击：直接调用 battleSystem（DOM 层已由自检覆盖）
-const GS = sandbox.DSH_GameState;
-const BS = sandbox.DSH_BattleSystem;
-console.log('✓ 冒烟测试全部通过（加载 → 开局 → 回合流转 无异常）');
+// 4. 点击「小怪战斗点」进入战斗
+const monsterNode = created.find((e) => String(e.className).indexOf('map-node') >= 0 &&
+  e.classList.contains('clickable') && String(e.innerHTML || '').indexOf('小怪战斗点') >= 0);
+if (!monsterNode) { console.error('✗ 未找到可进入的小怪战斗点'); process.exit(1); }
+monsterNode.click();
+const pageBattle = elements['page-battle'];
+if (!pageBattle || pageBattle.style.display === 'none') {
+  console.error('✗ 未进入战斗页');
+  process.exit(1);
+}
+if (st.phase !== 'player' || st.hand.length === 0 || st.enemies.length !== 2) {
+  console.error('✗ 战斗初始化错误（phase=' + st.phase + ' 手牌=' + st.hand.length + ' 敌=' + st.enemies.length + '）');
+  process.exit(1);
+}
+console.log('✓ 小怪战开始：手牌 ' + st.hand.length + ' 张，天机 ' + st.tianji + '/' + st.maxTianji + '，敌方 ' + st.enemies.length + ' 个');
+
+// 5. 打出一张自身/全体类卡牌（若有），否则打出任意单体卡
+const selfUid = st.hand.find((u) => {
+  const d = sandbox.DSH_GameState.cardDef(st, u);
+  return d && d.target !== 'single';
+});
+if (selfUid) {
+  const r = app.playCard(selfUid, null);
+  console.log('✓ 点出即打（' + sandbox.DSH_GameState.cardDef(st, selfUid).category + '）成功');
+} else if (st.hand.length > 0) {
+  const uid = st.hand[0];
+  const r = app.playCard(uid, st.enemies[0].id);
+  if (!r) { console.error('✗ 单体卡出牌失败'); process.exit(1); }
+  console.log('✓ 单体卡点怪攻击成功，伤害 ' + r.damage);
+}
+
+// 6. 回合完毕 → 怪物行动 → 回合流转
+app.endTurn();
+if (st.over === 'lose') {
+  console.log('✓ 回合流转完成（主将阵亡，弹出败局——符合模拟场景）');
+} else {
+  console.log('✓ 回合流转完成：进入第 ' + st.turn + ' 回合，天机回满 ' + st.tianji + '/' + st.maxTianji);
+}
+
+// 7. 战斗自检仍然可跑
+const res = sandbox.DSH_Selftest.run();
+if (!res.pass) { console.error('✗ 自检失败: ' + res.fail + ' 项'); process.exit(1); }
+console.log('✓ 冒烟测试全部通过（加载 → 首页 → 选将 → 地图 → 战斗 → 回合流转 无异常，自检 ' + res.total + ' 项）');

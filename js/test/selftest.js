@@ -1,7 +1,7 @@
 /**
- * selftest.js — 规则自检（五行克制 / 八卦成卦 / 64 卦完整性 / 伤害公式 /
- *               取整规则 / 魔将与英雄数据 / 规则库 / 战斗集成）
- * 目标：462+ 项断言。浏览器与 Node（tools/run-selftest.js）双环境可跑。
+ * selftest.js — 规则自检（v3：五行克制 / 八卦 / 64 卦 / 英雄数据 / 卡包 / 出牌 /
+ *               主将受击 / 卦象节奏 / 伤害公式 / 规则库 / 战斗集成）
+ * 浏览器与 Node（tools/run-selftest.js）双环境可跑。
  */
 (function (g) {
   'use strict';
@@ -16,7 +16,7 @@
     if (cond) ok++; else fail++;
   }
 
-  /** 序列随机源：依次返回给定值 */
+  /** 序列随机源 */
   function seqRng(seq) {
     var i = 0;
     return function () {
@@ -24,6 +24,49 @@
       i++;
       return v;
     };
+  }
+
+  /** 结构性测试用：跑完整 startBattle（小怪战） */
+  function setupMonsterBattle(seq) {
+    var GS = g.DSH_GameState;
+    var st = GS.createState({ random: seqRng(seq || [0.5]) });
+    st.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+    st.pack = GS.buildPack('dw1');
+    var ev = new g.DSH_EventSystem();
+    g.DSH_TurnSystem.startBattle(st, ev, 'monster');
+    return { st: st, ev: ev };
+  }
+
+  /**
+   * 确定性出牌测试用：手搭战场（不跑 startBattle，避免随机序列被抽牌消耗）。
+   * 手牌由调用方指定（hand[0] = 'wz1#0' 等）。
+   */
+  function setupPlay(seq) {
+    var GS = g.DSH_GameState;
+    var EN = g.DSH_ENEMIES;
+    var st = GS.createState({ random: seqRng(seq || [0.5]) });
+    st.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+    st.pack = GS.buildPack('dw1');
+    st.enemies = EN.GENERALS.slice(0, 2).map(function (e) {
+      return { id: e.id, name: e.name, element: e.element, hp: e.hp, maxHp: e.hp, atk: e.atk, aoe: e.aoe, alive: true };
+    });
+    st.boss = null;
+    st.battleKind = 'monster';
+    st.phase = 'player';
+    st.turn = 1;
+    st.tianji = 3;
+    st.maxTianji = 3;
+    st.hand = [];
+    st.usedThisTurn = {};
+    st.firstCardPlayedThisTurn = false;
+    st.freeChase = {};
+    st.tianjiUpApplied = false;
+    st.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    st.stats = { revived: false, firstAttackDone: false, attackCountThisTurn: 0,
+      consecutiveAttacks: 0, comboBonus: 0, nextAttackCrit: false, onceSaveUsed: false };
+    st.over = null;
+    var ev = new g.DSH_EventSystem();
+    return { st: st, ev: ev };
   }
 
   function run() {
@@ -36,6 +79,7 @@
     var GS = g.DSH_GameState;
     var BS = g.DSH_BattleSystem;
     var TS = g.DSH_TurnSystem;
+    var SS = g.DSH_SaveSystem;
 
     /* ============ 1. 五行克制（25 项） ============ */
     var expect = {
@@ -52,14 +96,14 @@
       });
     });
 
-    /* ============ 2. 克制环正确性（5 项） ============ */
+    /* ============ 2. 克制环（5 项） ============ */
     check('金克木', E.BEATS['金'] === '木');
     check('木克土', E.BEATS['木'] === '土');
     check('土克水', E.BEATS['土'] === '水');
     check('水克火', E.BEATS['水'] === '火');
     check('火克金', E.BEATS['火'] === '金');
 
-    /* ============ 3. 八卦成卦（爻序 24 + 规则 8 + 巽修正 1） ============ */
+    /* ============ 3. 八卦成卦（24 + 8 + 4） ============ */
     var linesExpect = {
       qian: ['阳', '阳', '阳'], dui: ['阳', '阳', '阴'], li: ['阳', '阴', '阳'],
       zhen: ['阳', '阴', '阴'], xun: ['阴', '阳', '阳'], kan: ['阴', '阳', '阴'],
@@ -77,7 +121,7 @@
     check('由爻序可反推坤', T.composeLower('阴', '阴', '阴').id === 'kun');
     check('由爻序可反推坎', T.composeLower('阴', '阳', '阴').id === 'kan');
 
-    /* ============ 4. 64 卦完整性（192 项） ============ */
+    /* ============ 4. 64 卦完整性（192 + 1） ============ */
     T.TRIGRAMS.forEach(function (up) {
       T.TRIGRAMS.forEach(function (lo) {
         var hex = HX.byPair(up.id, lo.id);
@@ -90,20 +134,30 @@
     });
     check('64 卦总数 = 64', HX.count === 64, 'got ' + HX.count);
 
-    /* ============ 5. 英雄数据（96 项） ============ */
-    var validRoles = ['武卒', '骑兵', '弓手', '谋士', '盾卫'];
+    /* ============ 5. 英雄数据 v3（13 名，约 70 项） ============ */
+    var validCats = ['战斗', '护卫', '计谋'];
+    var validTargets = ['single', 'all', 'self'];
+    var catSet = {};
     H.HEROES.forEach(function (h) {
       check('英雄 ' + h.id + ' 有id', !!h.id);
-      check('英雄 ' + h.id + ' 兵种合法', validRoles.indexOf(h.role) >= 0);
+      check('英雄 ' + h.id + ' 类别合法', validCats.indexOf(h.category) >= 0);
       check('英雄 ' + h.id + ' 五行合法', E.isValid(h.element));
-      check('英雄 ' + h.id + ' 阴阳合法', h.yinYang === '阳' || h.yinYang === '阴');
-      check('英雄 ' + h.id + ' 攻击>0', h.atk > 0);
-      check('英雄 ' + h.id + ' 血量>0', h.hp > 0);
-      check('英雄 ' + h.id + ' 有特技', !!h.skillName && h.skillMult > 1);
+      check('英雄 ' + h.id + ' 指向合法', validTargets.indexOf(h.target) >= 0);
+      check('英雄 ' + h.id + ' 有主将天赋', !!h.talent && !!h.talent.name && !!h.talent.type);
+      check('英雄 ' + h.id + ' 主将血量>0', h.hp > 0);
+      catSet[h.category] = true;
     });
-    var ids = H.HEROES.map(function (h) { return h.id; });
-    check('英雄 id 唯一', new Set(ids).size === 12);
-    check('英雄共 12 名', H.HEROES.length === 12);
+    check('英雄共 13 名', H.HEROES.length === 13);
+    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 13);
+    check('三类齐全：战斗', catSet['战斗'] === true);
+    check('三类齐全：护卫', catSet['护卫'] === true);
+    check('三类齐全：计谋', catSet['计谋'] === true);
+    check('战斗牌 ≥5 张', H.HEROES.filter(function (h) { return h.category === '战斗'; }).length >= 5);
+    check('护卫牌 ≥4 张', H.HEROES.filter(function (h) { return h.category === '护卫'; }).length >= 4);
+    check('计谋牌 ≥3 张', H.HEROES.filter(function (h) { return h.category === '计谋'; }).length >= 3);
+    check('新增白泽·玄机在册', !!H.byId('bz1'));
+    check('白泽为计谋/自身', H.byId('bz1').category === '计谋' && H.byId('bz1').target === 'self');
+    check('白泽特技=抽满手牌', H.byId('bz1').fillHand === true);
 
     /* ============ 6. 魔王数据（50 项） ============ */
     var enemies = EN.GENERALS.concat([EN.BOSS]);
@@ -114,33 +168,21 @@
       check('敌方 ' + e.name + ' 攻击>0', e.atk > 0);
       check('敌方 ' + e.name + ' 有名字', e.name.length >= 2);
     });
-    var eids = EN.GENERALS.map(function (e) { return e.id; });
-    check('五魔将 id 唯一', new Set(eids).size === 5);
+    check('五魔将 id 唯一', new Set(EN.GENERALS.map(function (e) { return e.id; })).size === 5);
     check('魔将共 5 名', EN.GENERALS.length === 5);
     check('魔王本体血量=100', EN.BOSS.hp === 100);
-    check('魔焰将全体攻击', EN.GENERALS[2].aoe === true);
-    check('魔焰将血量=22', EN.GENERALS[2].hp === 22);
-    check('五行覆盖 土水 火 火 金', EN.GENERALS.map(function (e) { return e.element; }).join('') === '土水火火金');
 
-    /* ============ 7. 伤害公式（18 项） ============ */
-    check('普通伤害 10x1.0', BS.calcDamage(10, 1, false, 0) === 10);
-    check('暴击 10x1.5', BS.calcDamage(10, 1, true, 0) === 15);
-    check('克制 10x1.3 取整', BS.calcDamage(10, 1.3, false, 0) === 13);
-    check('被克 6x0.7 取整', BS.calcDamage(6, 0.7, false, 0) === 4);
-    check('特技 10x1.6', BS.calcDamage(10, 1.6, false, 0) === 16);
-    check('连击增伤 +3', BS.calcDamage(10, 1, false, 3) === 13);
-    check('下限保护 max(2,1)', BS.calcDamage(1, 1, false, 0) === 2);
-    check('下限后连击 +5', BS.calcDamage(1, 1, false, 5) === 7);
-    check('攻击16 无修正', BS.calcDamage(16, 1, false, 0) === 16);
-    check('攻击15 特技x1.6=24', BS.calcDamage(15, 1.6, false, 0) === 24);
-    check('13x1.4=18.2→18', BS.calcDamage(13, 1.4, false, 0) === 18);
-    check('12x1.4=16.8→17', BS.calcDamage(12, 1.4, false, 0) === 17);
-    check('6x1.8=10.8→11', BS.calcDamage(6, 1.8, false, 0) === 11);
-    check('10x1.3x1.5=19.5→20', BS.calcDamage(10, 1.3, true, 0) === 20);
-    check('16x0.7=11.2→11', BS.calcDamage(16, 0.7, false, 0) === 11);
-    check('14x1.3=18.2→18', BS.calcDamage(14, 1.3, false, 0) === 18);
-    check('9x1.3=11.7→12', BS.calcDamage(9, 1.3, false, 0) === 12);
-    check('6x1.0+2连击=8', BS.calcDamage(6, 1, false, 2) === 8);
+    /* ============ 7. 伤害公式（10 项） ============ */
+    check('普通 10x1.0', BS.calcDamage(10, 1, false, null, 0) === 10);
+    check('暴击 10x1.5', BS.calcDamage(10, 1, true, 1.5, 0) === 15);
+    check('黑杀特技 15x2.0', BS.calcDamage(15, 1, true, 2, 0) === 30);
+    check('克制 10x1.3', BS.calcDamage(10, 1.3, false, null, 0) === 13);
+    check('被克 6x0.7', BS.calcDamage(6, 0.7, false, null, 0) === 4);
+    check('下限保护 max(2,1)', BS.calcDamage(1, 1, false, null, 0) === 2);
+    check('连击增伤 +3', BS.calcDamage(10, 1, false, null, 3) === 13);
+    check('暴击+克制 10x1.3x1.5', BS.calcDamage(10, 1.3, true, 1.5, 0) === 20);
+    check('慕容珩天赋 12x2.0', BS.calcDamage(12, 1, true, 2.0, 0) === 24);
+    check('草间溜全体 10x1.3', BS.calcDamage(10, 1.3, false, null, 0) === 13);
 
     /* ============ 8. 规则库（25 种，50 项） ============ */
     var ruleKeys = Object.keys(HX.RULE_TEXT);
@@ -149,7 +191,6 @@
       'burnRound', 'firstCrit', 'comboCrit', 'lifesteal', 'dmgShield', 'revive',
       'freezeSkill', 'burnOnHit', 'windBurn', 'chase', 'thorns', 'dmgReduce',
       'critChance', 'stunHit', 'healOnHit', 'empowNext', 'qiantian', 'jiji', 'weiji'];
-    // 注：文档称 24 条规则，实际表内列出 25 行（含 jiji 与 weiji），全部实现
     requiredKeys.forEach(function (k) {
       check('规则 ' + k + ' 存在', !!HX.RULE_TEXT[k]);
       check('规则 ' + k + ' 有名称', HX.RULE_TEXT[k].name.length >= 2);
@@ -174,185 +215,207 @@
     ev.emit('t3', {});
     check('事件清空全部', fired === 1);
 
-    /* ============ 10. 状态默认值（6 项） ============ */
+    /* ============ 10. 状态默认（8 项） ============ */
     var st = GS.createState({ random: seqRng([0.5]) });
-    check('初始天机 4', st.tianji === 4);
-    check('九宫格 5 格', st.board.length === 5);
-    check('中宫 slot 1', GS.CENTER_SLOT === 1);
-    check('初始回合 1', st.turn === 1);
-    check('牌库 12 英雄', st.heroes.length === 12);
-    check('五魔将 + 本体', st.enemies.length === 5 && !!st.boss);
-    check('初始阶段 opening', st.phase === 'opening');
+    check('初始天机 3', st.tianji === 3);
+    check('默认天机上限 3', st.maxTianji === 3);
+    check('手牌上限 10（不可改）', GS.HAND_MAX === 10);
+    check('初始阶段 home', st.phase === 'home');
+    check('初始层数 1', st.layer === 1);
+    check('地图节点 4 个', st.mapNodes.length === 4);
+    check('节点顺序 小怪/营帐/事件/魔王', st.mapNodes.map(function (n) { return n.type; }).join(',') === 'monster,camp,event,boss');
+    check('初始无主将/无卡包', st.commander === null && st.pack.length === 0);
 
-    /* ============ 11. 抽牌（4 项） ============ */
-    st.upperTrigram = 'qian';
-    TS.drawBoard(st);
-    var onBoard = st.board.filter(function (x) { return x !== null; });
-    check('首抽 5 张', onBoard.length === 5);
-    check('首抽固定含萧靳 wz3', onBoard.indexOf('wz3') >= 0);
-    check('桌面无重复英雄', new Set(onBoard).size === onBoard.length);
-    var hpBefore = GS.getHero(st, 'wz1').hp;
-    GS.getHero(st, 'wz1').hp = 2;
-    TS.drawBoard(st); // 再抽保留血量
-    check('血量保留在牌库', GS.getHero(st, 'wz1').hp === 2);
-    st = null;
+    /* ============ 11. 卡包构建（8 项） ============ */
+    var pack = GS.buildPack('wz1');
+    check('卡包 48 张（上限）', pack.length === 48);
+    check('主将不出现在卡包', pack.every(function (c) { return c.heroId !== 'wz1'; }));
+    check('卡包含 12 种偏将', new Set(pack.map(function (c) { return c.heroId; })).size === 12);
+    check('每种 4 张', pack.filter(function (c) { return c.heroId === 'gs1'; }).length === 4);
+    check('uid 唯一', new Set(pack.map(function (c) { return c.uid; })).size === 48);
+    check('卡包含新增白泽', pack.some(function (c) { return c.heroId === 'bz1'; }));
+    check('白泽当主将时卡包满 48', GS.buildPack('bz1').length === 48);
+    check('白泽主将时不含白泽', GS.buildPack('bz1').every(function (c) { return c.heroId !== 'bz1'; }));
 
-    /* ============ 12. 魔王守护与解锁（3 项） ============ */
-    var st2 = GS.createState({ random: seqRng([0.5]) });
-    check('魔将未灭时本体不可攻击', !GS.enemyAlive(st2, 'boss'));
-    st2.enemies.forEach(function (e) { e.hp = 0; e.alive = false; });
-    check('魔将全灭后本体解锁', GS.bossUnlocked(st2) && GS.enemyAlive(st2, 'boss'));
-    st2.boss.hp = 0;
-    st2.boss.alive = false;
-    BS.checkWin(st2);
-    check('全灭魔将与本体判定胜利', st2.over === 'win');
+    /* ============ 12. 战斗开始（9 项） ============ */
+    var b1 = setupMonsterBattle([0.5]);
+    check('小怪战敌方 2 个', b1.st.enemies.length === 2);
+    check('小怪战无魔王本体', b1.st.boss === null);
+    check('起手 5 张手牌', b1.st.hand.length === 5);
+    check('手牌不超上限', b1.st.hand.length <= GS.HAND_MAX);
+    check('手牌全部来自卡包', b1.st.hand.every(function (u) { return GS.cardInHand(b1.st, u); }));
+    check('开局防御归零', b1.st.commander.defense === 0);
+    check('开局进入玩家回合', b1.st.phase === 'player' && b1.st.turn === 1);
+    check('开局无卦象', b1.st.lowerTrigram === null && b1.st.currentHexagram === null);
+    check('天机 3/3', b1.st.tianji === 3 && b1.st.maxTianji === 3);
 
-    /* ============ 13. 战斗集成（10 项） ============ */
-    var st3 = GS.createState({ random: seqRng([0.5, 0.5]) });
-    st3.upperTrigram = 'qian';
-    st3.lowerTrigram = 'qian';
-    st3.currentHexagram = { name: '测试卦', rules: [] };
-    var ev3 = new g.DSH_EventSystem();
-    g.DSH_RuleSystem.registerRules(st3, ev3);
-    // 布阵：ms1(水,攻10) slot0、gs1(木,攻14) slot1、dw1(土,攻6) slot2
-    var alive = GS.aliveHeroes(st3);
-    st3.board = new Array(5).fill(null);
-    st3.board[0] = 'ms1'; // 水 攻10
-    st3.board[1] = 'gs1'; // 木 攻14
-    st3.board[2] = 'gs2'; // 木 攻13
-    st3.board[3] = 'dw1'; // 土 攻6
-    st3.board[4] = alive[0].id;
-    st3.phase = 'player';
-    var e2 = GS.getEnemy(st3, 'e2'); // 浊流魔 水 16
-    var e1 = GS.getEnemy(st3, 'e1'); // 蚀骨爪魔 土 18
-    var e5 = GS.getEnemy(st3, 'e5'); // 狂煞魔 金 16
-    var e4 = GS.getEnemy(st3, 'e4'); // 赤炎魔 火 20
-    var r = BS.attackHeroToEnemy(st3, ev3, 0, 'e2'); // 水vs水 1.0 → 10
-    check('攻击执行成功', !!r);
-    check('水vs水 无克制: 10 伤害', r && r.damage === 10, 'got ' + (r && r.damage));
-    check('天机消耗 1 点', st3.tianji === 3);
-    check('英雄标记已行动', st3.usedThisTurn['ms1'] === true);
-    check('敌方扣血 16-10=6', e2.hp === 6);
-    check('重复攻击被拒', BS.attackHeroToEnemy(st3, ev3, 0, 'e2') === null);
-    var r2 = BS.attackHeroToEnemy(st3, ev3, 1, 'e1'); // gs1 木14 克土 x1.3 → 18.2→18 击杀
-    check('木克土 x1.3: 18 伤害', r2 && r2.damage === 18, 'got ' + (r2 && r2.damage));
-    check('目标被击败', r2 && r2.killed === true);
-    check('魔将死亡退场', e1.alive === false);
-    var r3 = BS.attackHeroToEnemy(st3, ev3, 2, 'e5'); // gs2 木13 被金克 x0.7 → 9.1→9
-    check('木被金克 x0.7: 9 伤害', r3 && r3.damage === 9, 'got ' + (r3 && r3.damage));
-    check('金魔将未死 16-9=7', e5.hp === 7);
-    var r4 = BS.attackHeroToEnemy(st3, ev3, 3, 'e4'); // dw1 土6 vs 火 → 1.0 → 6
-    check('土vs火 无克制: 6 伤害', r4 && r4.damage === 6, 'got ' + (r4 && r4.damage));
-    check('受击记录写入', st3.lastHits.length >= 4 && st3.lastHits[0].kind === 'enemy' && st3.lastHits[0].id === 'e2');
-    st3.tianji = 0;
-    st3.usedThisTurn = {};
-    check('天机耗尽后拒绝', BS.attackHeroToEnemy(st3, ev3, 1, 'e2') === null);
+    // 白泽主将天赋：起手 7 张
+    var stBz = GS.createState({ random: seqRng([0.5]) });
+    stBz.commander = { heroId: 'bz1', hp: 10, maxHp: 10, defense: 0 };
+    stBz.pack = GS.buildPack('bz1');
+    g.DSH_TurnSystem.startBattle(stBz, new g.DSH_EventSystem(), 'monster');
+    check('白泽主将起手 7 张', stBz.hand.length === 7);
+    check('白泽天赋不改手牌上限', GS.HAND_MAX === 10);
 
-    // 暴击路径（rnd 0.05 → 暴击；目标 e2 水，水vs水 1.0 → 10x1.5=15）
-    var st4 = GS.createState({ random: seqRng([0.05, 0.9]) });
-    st4.currentHexagram = { name: '测试卦2', rules: [] };
-    var ev4 = new g.DSH_EventSystem();
-    g.DSH_RuleSystem.registerRules(st4, ev4);
-    st4.board = new Array(5).fill(null);
-    st4.board[0] = 'ms1';
-    var alive4 = GS.aliveHeroes(st4);
-    for (var bi2 = 1; bi2 < 5; bi2++) st4.board[bi2] = alive4[bi2 % alive4.length].id;
-    st4.phase = 'player';
-    var r4 = BS.attackHeroToEnemy(st4, ev4, 0, 'e2');
-    check('暴击 10x1.0x1.5=15', r4 && r4.damage === 15, 'got ' + (r4 && r4.damage));
+    /* ============ 13. 出牌：单体战斗（8 项） ============ */
+    var b2 = setupPlay([0.99, 0.99]); // 不暴击、不特技
+    b2.st.hand = ['wz1#0'];
+    var targetEnemy = b2.st.enemies[0];
+    check('单体卡不给目标返回 null', BS.playCard(b2.st, b2.ev, 'wz1#0', null) === null);
+    var before = targetEnemy.hp;
+    var r = BS.playCard(b2.st, b2.ev, 'wz1#0', targetEnemy.id);
+    check('单体攻击执行成功', !!r);
+    var expectDmg = Math.max(2, Math.round(16 * E.counterMult('火', targetEnemy.element)));
+    check('伤害 = 攻击×五行克制（' + expectDmg + '）', r && r.damage === expectDmg, 'got ' + (r && r.damage));
+    check('敌方扣血正确', targetEnemy.hp === before - expectDmg);
+    check('天机 3→2', b2.st.tianji === 2);
+    check('手牌移除该卡', !GS.cardInHand(b2.st, 'wz1#0'));
+    check('标记已使用', b2.st.usedThisTurn['wz1#0'] === true);
+    check('卡包仍 48 张（用完回卡包）', b2.st.pack.length === 48);
 
-    /* ============ 14. 护盾吸收（2 项） ============ */
-    var st5 = GS.createState({ random: seqRng([0.5]) });
-    var hero5 = GS.getHero(st5, 'dw1');
-    hero5.hp = 14;
-    st5.shield['dw1'] = 5;
-    var ev5 = new g.DSH_EventSystem();
-    var died5 = BS.damageHero(st5, ev5, hero5, 7, null);
-    check('护盾优先吸收: 盾5+血扣2', hero5.hp === 12 && st5.shield['dw1'] === 0);
-    check('未致死', died5 === false);
+    /* ============ 14. 出牌：全体战斗（3 项） ============ */
+    var b3 = setupPlay([0.99, 0.99, 0.99, 0.99]);
+    b3.st.hand = ['gs2#0'];
+    var beforeHps = b3.st.enemies.map(function (e) { return e.hp; });
+    var r3 = BS.playCard(b3.st, b3.ev, 'gs2#0', null);
+    check('全体卡无需目标可打出', !!r3);
+    check('全体伤害命中所有敌人', b3.st.enemies.every(function (e, i) { return e.hp < beforeHps[i]; }));
+    check('全体卡耗 1 天机', b3.st.tianji === 2);
 
-    /* ============ 15. 复活规则（2 项） ============ */
-    var st6 = GS.createState({ random: seqRng([0.5]) });
-    st6.currentHexagram = { name: '坤卦测试', rules: [{ key: 'revive' }] };
-    var ev6 = new g.DSH_EventSystem();
-    g.DSH_RuleSystem.registerRules(st6, ev6);
-    var hero6 = GS.getHero(st6, 'wz1');
-    st6.board[0] = 'wz1';
-    hero6.hp = 1;
-    var died6 = BS.damageHero(st6, ev6, hero6, 3, null);
-    check('复活触发 prevent', died6 === false && hero6.hp > 0);
-    check('复活后 50% 防御', hero6.hp === Math.round(hero6.maxHp * 0.5));
-    check('复活后 +3 盾', st6.shield['wz1'] === 3);
+    /* ============ 15. 出牌：护卫（3 项） ============ */
+    var b4 = setupPlay([0.5]);
+    b4.st.hand = ['qb1#0'];
+    var r4 = BS.playCard(b4.st, b4.ev, 'qb1#0', null);
+    check('护卫卡直接打出', !!r4);
+    check('获得 9 点防御', b4.st.commander.defense === 9);
+    check('护卫卡耗 1 天机', b4.st.tianji === 2);
 
-    /* ============ 16. 持续伤害（2 项） ============ */
-    var st7 = GS.createState({ random: seqRng([0.5]) });
-    st7.burnStacks['e1'] = 2;
-    st7.windBurnLayers['e1'] = 1;
-    var e1hp = GS.getEnemy(st7, 'e1').hp;
-    BS.applyDot(st7, new g.DSH_EventSystem());
-    check('燃烧2层(2伤)+风蚀1层(2伤)=4', GS.getEnemy(st7, 'e1').hp === e1hp - 4);
+    /* ============ 16. 出牌：计谋（4 项） ============ */
+    var b5 = setupPlay([0.5]);
+    b5.st.hand = ['ms1#0'];
+    var handLen0 = b5.st.hand.length;
+    BS.playCard(b5.st, b5.ev, 'ms1#0', null);
+    check('观星眼：天机上限 +1', b5.st.tianjiUpApplied === true && b5.st.maxTianji === 4);
+    check('观星眼：抽 2 张', b5.st.hand.length === handLen0 - 1 + 2);
 
-    /* ============ 17. 魔王回合（2 项） ============ */
-    var st8 = GS.createState({ random: seqRng([0.3, 0.3, 0.3, 0.3]) });
-    st8.phase = 'player';
-    // 桌面放 3 名盾卫
-    st8.board = new Array(9).fill(null);
-    st8.board[0] = 'dw1'; st8.board[1] = 'dw2'; st8.board[2] = 'gs1';
-    var acted = BS.bossActPhase(st8, new g.DSH_EventSystem());
-    check('魔王每回合最多行动 4 次', acted <= 4);
-    check('魔王行动后敌方扣血或我方受损', st8.over === null || st8.over === 'lose');
+    var b6 = setupPlay([0.5]);
+    b6.st.hand = ['bz1#0'];
+    BS.playCard(b6.st, b6.ev, 'bz1#0', null);
+    check('白泽：手牌抽满至 10', b6.st.hand.length === GS.HAND_MAX);
+    check('白泽：不超过 10（多出的回卡包）', b6.st.hand.length <= GS.HAND_MAX);
 
-    /* ============ 18. 回合流转（3 项） ============ */
-    var st9 = GS.createState({ random: seqRng([0.5, 0.5, 0.5, 0.5]) });
-    st9.upperTrigram = 'qian';
-    st9.phase = 'player';
-    var ev9 = new g.DSH_EventSystem();
-    TS.startGame(st9, ev9);
-    check('开局后进入玩家回合', st9.phase === 'player' && st9.turn === 1);
-    check('开局九宫格满 5 张', st9.board.filter(Boolean).length === 5);
-    check('开局有卦象', !!st9.currentHexagram && st9.currentHexagram.name.length >= 2);
-    var turnBefore = st9.turn;
-    var ev9b = new g.DSH_EventSystem();
-    // 给敌人留一点血，避免魔王行动直接胜利/失败
-    TS.endPlayerTurn(st9, ev9b);
-    check('回合流转到下一回合', st9.turn === turnBefore + 1 || st9.over !== null);
-    check('天机回满', st9.tianji === 4 || st9.over !== null);
+    /* ============ 17. 单体指向：护卫/计谋减益（4 项） ============ */
+    var b7 = setupPlay([0.5]);
+    b7.st.hand = ['dw2#0'];
+    b7.st.commander.hp = 10; // 留出回血空间
+    var e0 = b7.st.enemies[0];
+    var e0atk = GS.enemyAtk(b7.st, e0);
+    var hp0 = b7.st.commander.hp;
+    BS.playCard(b7.st, b7.ev, 'dw2#0', e0.id);
+    check('闷嘴石：敌方攻击 -30%', b7.st.atkDebuff[e0.id] === 30);
+    check('闷嘴石：敌方攻击力下降', GS.enemyAtk(b7.st, e0) === Math.floor(e0atk * 0.7));
+    check('闷嘴石：恢复 3 点血量', b7.st.commander.hp === hp0 + 3);
+    b7.st.atkDebuff[e0.id] = 40;
+    b7.st.hand = ['ms2#0'];
+    BS.playCard(b7.st, b7.ev, 'ms2#0', e0.id);
+    check('冷算子：减益封顶 60%', b7.st.atkDebuff[e0.id] === 60);
 
-    /* ============ 19. 八卦总览数据（8 项） ============ */
-    T.TRIGRAMS.forEach(function (t) {
-      check('八卦 ' + t.name + ' 有符号', !!t.symbol && t.symbol.length === 1);
-    });
+    /* ============ 18. 主将受击（6 项） ============ */
+    var b8 = setupPlay([0.5]);
+    b8.st.commander = { heroId: 'wz1', hp: 3, maxHp: 3, defense: 5 }; // 红炮无减伤天赋
+    var died = BS.damageCommander(b8.st, b8.ev, 7, null);
+    check('防御优先吸收：防5血扣2', b8.st.commander.defense === 0 && b8.st.commander.hp === 1);
+    check('未致死', died === false);
+    BS.damageCommander(b8.st, b8.ev, 12, null);
+    check('血量归零判负', b8.st.over === 'lose' && b8.st.commander.hp === 0);
 
-    /* ============ 20. 卦象特效推导（4 项） ============ */
-    var hexQian = HX.byPair('qian', 'qian');
-    check('乾为天 含首击必暴', hexQian.rules.some(function (r) { return r.key === 'firstCrit'; }));
-    check('乾为天 含连击增伤', hexQian.rules.some(function (r) { return r.key === 'empowNext'; }));
-    var hexKun = HX.byPair('kun', 'kun');
-    check('坤为地 含复活', hexKun.rules.some(function (r) { return r.key === 'revive'; }));
-    check('坤为地 含受伤转盾', hexKun.rules.some(function (r) { return r.key === 'dmgShield'; }));
+    var b9 = setupPlay([0.5]);
+    b9.st.commander = { heroId: 'ms2', hp: 1, maxHp: 10, defense: 0 }; // 希寒川：免死
+    var died9 = BS.damageCommander(b9.st, b9.ev, 9, null);
+    check('希寒川天赋：免死留 1 血', died9 === false && b9.st.commander.hp === 1 && b9.st.stats.onceSaveUsed === true);
+    BS.damageCommander(b9.st, b9.ev, 9, null);
+    check('免死用尽后战死', b9.st.over === 'lose');
 
-    /* ============ 21. 皮肤数据（皮肤概念，54 项） ============ */
-    H.HEROES.forEach(function (h) {
-      check('英雄 ' + h.id + ' 至少 1 个皮肤', h.skins.length >= 1);
-      check('英雄 ' + h.id + ' 皮肤 id 唯一', new Set(h.skins.map(function (s) { return s.id; })).size === h.skins.length);
-      var namesOk = h.skins.every(function (s) { return !!s.name && !!s.file; });
-      check('英雄 ' + h.id + ' 皮肤有名称与文件', namesOk);
-      check('英雄 ' + h.id + ' 默认皮肤=第一项', g.DSH_HEROES.defaultSkinId(h) === h.skins[0].id);
-      check('英雄 ' + h.id + ' 皮肤查找可用', g.DSH_HEROES.skinOf(h, h.skins[0].id).id === h.skins[0].id);
-    });
-    check('破阵郎 有 2 个皮肤', g.DSH_HEROES.byId('qb1').skins.length === 2);
-    check('破阵郎 含蓄须皮肤', !!g.DSH_HEROES.skinOf(g.DSH_HEROES.byId('qb1'), 'beard'));
-    check('铁脚汉 有 2 个皮肤', g.DSH_HEROES.byId('qb2').skins.length === 2);
-    check('铁脚汉 含金甲/银甲', !!g.DSH_HEROES.skinOf(g.DSH_HEROES.byId('qb2'), 'gold') &&
-      !!g.DSH_HEROES.skinOf(g.DSH_HEROES.byId('qb2'), 'silver'));
-    check('红炮 默认皮肤为原版', g.DSH_HEROES.defaultSkinId(g.DSH_HEROES.byId('wz1')) === 'default');
+    /* ============ 19. 卦象节奏：每场重算 3/5/7（6 项） ============ */
+    var b10 = setupMonsterBattle([0.5]);
+    b10.st.commander.hp = 999; // 撑住回合推进
+    while (b10.st.turn < 3 && !b10.st.over) g.DSH_TurnSystem.endPlayerTurn(b10.st, b10.ev);
+    check('第 3 回合抽下卦', b10.st.lowerTrigram !== null && b10.st.upperTrigram === null);
+    while (b10.st.turn < 5 && !b10.st.over) g.DSH_TurnSystem.endPlayerTurn(b10.st, b10.ev);
+    check('第 5 回合抽上卦', b10.st.upperTrigram !== null);
+    check('第 7 回合前无天命', b10.st.currentHexagram === null);
+    while (b10.st.turn < 7 && !b10.st.over) g.DSH_TurnSystem.endPlayerTurn(b10.st, b10.ev);
+    check('第 7 回合天命觉醒', b10.st.currentHexagram !== null);
+    check('天命 = 上×下 64 卦', b10.st.currentHexagram &&
+      HX.byPair(b10.st.upperTrigram, b10.st.lowerTrigram).name === b10.st.currentHexagram.name);
+    check('每场战斗重新算：新开一场卦象清零', (function () {
+      var b = setupMonsterBattle([0.5]);
+      return b.st.lowerTrigram === null && b.st.upperTrigram === null && b.st.currentHexagram === null;
+    })());
 
-    /* ============ 22. 状态携带皮肤（2 项） ============ */
-    var stSkin = GS.createState({ random: seqRng([0.5]) });
-    var hSkin = GS.getHero(stSkin, 'qb1');
-    check('状态英雄带 skinId', !!hSkin.skinId && hSkin.skinId === 'default');
-    hSkin.skinId = 'beard';
-    check('皮肤切换写回状态', GS.getHero(stSkin, 'qb1').skinId === 'beard');
+    /* ============ 20. 战斗胜利/失败判定（5 项） ============ */
+    var b11 = setupMonsterBattle([0.5]);
+    b11.st.enemies.forEach(function (e) { e.hp = 0; e.alive = false; });
+    BS.checkWin(b11.st);
+    check('小怪全灭即胜', b11.st.over === 'win');
+
+    var b12 = GS.createState({ random: seqRng([0.5]) });
+    b12.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+    b12.pack = GS.buildPack('dw1');
+    g.DSH_TurnSystem.startBattle(b12, new g.DSH_EventSystem(), 'boss');
+    check('魔王战敌方 5+1', b12.enemies.length === 5 && !!b12.boss);
+    check('魔王未解锁时本体不可攻击', !GS.enemyAlive(b12, 'boss'));
+    b12.enemies.forEach(function (e) { e.hp = 0; e.alive = false; });
+    check('魔将全灭后本体解锁', GS.bossUnlocked(b12) && GS.enemyAlive(b12, 'boss'));
+    b12.boss.hp = 0;
+    b12.boss.alive = false;
+    BS.checkWin(b12);
+    check('魔王战全灭判胜', b12.over === 'win');
+
+    /* ============ 21. 追击（2 项） ============ */
+    var b13 = setupPlay([0.99, 0.05]); // 不暴击、特技触发（gs1 追击）
+    b13.st.hand = ['gs1#0'];
+    var tj0 = b13.st.tianji;
+    var r13 = BS.playCard(b13.st, b13.ev, 'gs1#0', b13.st.enemies[0].id);
+    check('追击触发（特技掷骰命中）', !!r13 && r13.chased === true);
+    check('追击不耗天机且卡留手牌', b13.st.tianji === tj0 && GS.cardInHand(b13.st, 'gs1#0'));
+
+    /* ============ 22. 黑杀暴击特技（2 项） ============ */
+    var b14 = setupPlay([0.99, 0.05]); // 不基础暴击、特技触发
+    b14.st.hand = ['wz3#0'];
+    var e14 = b14.st.enemies[0];
+    var r14 = BS.playCard(b14.st, b14.ev, 'wz3#0', e14.id);
+    check('黑杀特技=暴击伤害×2', r14 && r14.damage === Math.max(2, Math.round(15 * E.counterMult('火', e14.element) * 2)));
+
+    /* ============ 23. 存档序列化（3 项） ============ */
+    var b15 = GS.createState({ random: seqRng([0.5]) });
+    b15.commander = { heroId: 'dw1', hp: 10, maxHp: 14, defense: 3 };
+    b15.pack = GS.buildPack('dw1');
+    b15.layer = 2;
+    var s = SS.serialize(b15);
+    check('存档含层数/主将/卡包', s.layer === 2 && s.commander.heroId === 'dw1' && s.pack.length === 48);
+    check('存档不含战斗状态', s.hand === undefined && s.turn === undefined);
+    check('存档版本 v3', s.v === 3);
+
+    /* ============ 24. 层数成长（3 项） ============ */
+    check('小怪战血量按层成长', (function () {
+      var a = GS.createState({ random: seqRng([0.5]) });
+      a.layer = 3;
+      a.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+      a.pack = GS.buildPack('dw1');
+      g.DSH_TurnSystem.startBattle(a, new g.DSH_EventSystem(), 'monster');
+      var base = EN.byId(a.enemies[0].id);
+      return a.enemies[0].maxHp === Math.round(base.hp * 1.6);
+    })());
+    check('怪物攻击按层成长', (function () {
+      var a = GS.createState({ random: seqRng([0.5]) });
+      a.layer = 2;
+      a.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+      a.pack = GS.buildPack('dw1');
+      g.DSH_TurnSystem.startBattle(a, new g.DSH_EventSystem(), 'monster');
+      var base = EN.byId(a.enemies[0].id);
+      return a.enemies[0].atk === Math.round(base.atk * 1.15);
+    })());
 
     /* ============ 汇总 ============ */
     details = assert.slice();
