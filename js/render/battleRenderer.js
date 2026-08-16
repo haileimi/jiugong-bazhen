@@ -174,10 +174,15 @@
 
     function buildRow(uids, cls) {
       var row = el('div', 'hand-row ' + cls, '');
-      uids.forEach(function (uid) {
+      uids.forEach(function (uid, i) {
         var hero = g.DSH_GameState.cardDef(state, uid);
         if (!hero) return;
         var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
+        // 扇形：中间直、两侧微转（Main Container 复刻）
+        var angle = (i - (uids.length - 1) / 2) * 4;
+        var lift = -Math.abs(angle) * 0.6;
+        card.style.setProperty('--fan', 'rotate(' + angle + 'deg)');
+        card.style.setProperty('--fan-y', 'translateY(' + lift + 'px)');
         if (uid === selUid) card.classList.add('selected');
         row.appendChild(card);
       });

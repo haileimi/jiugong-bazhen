@@ -37,7 +37,7 @@ function makeEl(tag) {
     tagName: (tag || 'div').toUpperCase(),
     className: '',
     dataset: {},
-    style: {},
+    style: { setProperty: function () {} },
     children: [],
     _handlers: {},
     textContent: '',

@@ -34,66 +34,54 @@
     return 'images/hero/' + hero.id + '/' + (skinId || 'default') + '.png?v=3';
   }
 
-  /** 招式卡（手牌） */
+  /** 招式卡（手牌，王国之战卡牌风：青横幅/金角标/插画区/棕木信息板） */
   function createHandCard(hero, state, uid) {
     var card = document.createElement('div');
-    card.className = 'hero-card hand-card' + (state.usedThisTurn[uid] ? ' acted' : '');
+    card.className = 'hero-card hand-card kc-card' + (state.usedThisTurn[uid] ? ' acted' : '');
     card.dataset.uid = uid;
     card.dataset.heroId = hero.id;
     card.dataset.target = hero.target;
 
-    var frame = document.createElement('div');
-    frame.className = 'hero-frame';
-    card.appendChild(frame);
+    // 顶部青色名称横幅（诨名）
+    var banner = document.createElement('div');
+    banner.className = 'kc-banner';
+    banner.textContent = hero.nick;
+    banner.title = hero.name + ' · ' + hero.category + ' · ' + (TARGET_TEXT[hero.target] || '');
+    card.appendChild(banner);
 
-    var inner = document.createElement('div');
-    inner.className = 'hero-inner';
-    inner.style.background = 'linear-gradient(180deg, ' + g.DSH_ELEMENTS.COLOR[hero.element] + 'cc, ' +
-      g.DSH_ELEMENTS.COLOR[hero.element] + '99)';
-    frame.appendChild(inner);
+    // 金色角标（五行）
+    var badge = document.createElement('div');
+    badge.className = 'kc-badge';
+    badge.textContent = g.DSH_ELEMENTS.ICON[hero.element] || '';
+    badge.title = hero.element;
+    card.appendChild(badge);
 
+    // 插画区（黑底 + 立绘 + 纹理 + 光）
+    var art = document.createElement('div');
+    art.className = 'kc-art';
     var img = document.createElement('img');
-    img.className = 'hero-img';
+    img.className = 'kc-art-img';
     img.alt = hero.nick;
     img.draggable = false;
     img.src = imageSrc(hero, 'default');
     img.onerror = function () {
       img.style.display = 'none';
-      var fb = frame.querySelector('.hero-fallback');
-      if (fb) fb.style.display = 'flex';
+      var fb = document.createElement('div');
+      fb.className = 'kc-art-fb';
+      fb.textContent = CAT_ICON[hero.category] || '?';
+      art.appendChild(fb);
     };
-    frame.appendChild(img);
+    art.appendChild(img);
+    card.appendChild(art);
 
-    var fallback = document.createElement('div');
-    fallback.className = 'hero-fallback';
-    fallback.style.display = 'none';
-    fallback.innerHTML = '<span class="hero-fallback-icon">' + (CAT_ICON[hero.category] || '?') + '</span>';
-    frame.appendChild(fallback);
-
-    var data = document.createElement('div');
-    data.className = 'hero-data';
-    data.style.background = 'linear-gradient(180deg, ' + g.DSH_ELEMENTS.COLOR[hero.element] + '55 0%, ' +
-      g.DSH_ELEMENTS.COLOR[hero.element] + 'cc 42%, #14100c 100%)';
-    data.innerHTML =
-      '<div class="hero-name">' + hero.nick + '</div>' +
-      '<div class="hero-sub">' + hero.name + ' · ' + hero.category +
-      '<span class="hero-target">' + (TARGET_TEXT[hero.target] || '') + '</span></div>' +
-      '<div class="hero-skill">' + hero.desc + '</div>';
-    frame.appendChild(data);
-
-    // 类别角标（左上）
-    var cat = document.createElement('div');
-    cat.className = 'hero-cat-badge';
-    cat.textContent = CAT_ICON[hero.category] || '';
-    cat.title = hero.category;
-    card.appendChild(cat);
-
-    // 五行角标（右上）
-    var elm = document.createElement('div');
-    elm.className = 'hero-element-badge';
-    elm.textContent = g.DSH_ELEMENTS.ICON[hero.element] || '';
-    elm.title = hero.element;
-    card.appendChild(elm);
+    // 底部棕木信息板（效果描述）
+    var plate = document.createElement('div');
+    plate.className = 'kc-plate';
+    var plateText = document.createElement('span');
+    plateText.textContent = hero.desc;
+    plate.appendChild(plateText);
+    plate.title = hero.desc;
+    card.appendChild(plate);
 
     return card;
   }
