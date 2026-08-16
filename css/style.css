@@ -972,44 +972,38 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 手牌区（单排 331 宽，横向滑动，卡多可滚动查看） ---- */
+/* ---- 手牌区（单排 331 宽，每排 4 张，多了换行加排） ---- */
 #hand-zone {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 0;
-  min-height: 142px;
+  padding: 6px 0;
+  min-height: 150px;
   width: 331px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  gap: 6px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .hand-row {
   display: flex;
   align-items: flex-end;
-  justify-content: flex-start;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  min-height: 136px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  padding: 30px 6px 8px;
-  scrollbar-width: none;
+  min-height: 140px;
+  padding: 28px 6px 8px;
 }
-.hand-row::-webkit-scrollbar { display: none; }
 .hand-card {
   position: relative;
-  width: 62px;
+  width: 76px;
   aspect-ratio: 210 / 305;
-  margin-left: 0;
   flex: 0 0 auto;
   cursor: pointer;
   transition: transform 0.15s ease, z-index 0s;
-  scroll-snap-align: center;
 }
-.hand-card + .hand-card { margin-left: -10px; }
 .hand-card:hover { transform: translateY(-8px); z-index: 6; }
 .hand-card.selected {
   transform: scale(1.2) translateY(-16px);
