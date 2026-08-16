@@ -98,76 +98,12 @@
     return card;
   }
 
-  /** 主将卡（战场底部） */
-  function createCommanderCard(state) {
-    if (!state.commander) return null;
-    var hero = g.DSH_HEROES.byId(state.commander.heroId);
-    var card = document.createElement('div');
-    card.className = 'commander-card';
-
-    var head = document.createElement('div');
-    head.className = 'commander-head';
-    head.innerHTML = '<span class="commander-icon">' + (CAT_ICON[hero.category] || '🏮') + '</span>' +
-      '<span class="commander-name">主将 · ' + hero.nick + '（' + hero.name + '）</span>' +
-      '<span class="commander-talent" title="' + hero.talent.desc + '">' + hero.talent.name + '</span>';
-    card.appendChild(head);
-
-    var hpRow = document.createElement('div');
-    hpRow.className = 'commander-bar-row';
-    hpRow.innerHTML = '<span class="commander-bar-label">血</span>';
-    var hpBar = document.createElement('div');
-    hpBar.className = 'commander-bar hp-bar';
-    var hpFill = document.createElement('div');
-    hpFill.className = 'commander-bar-fill hp-fill';
-    hpBar.appendChild(hpFill);
-    hpRow.appendChild(hpBar);
-    var hpText = document.createElement('span');
-    hpText.className = 'commander-bar-text';
-    hpText.textContent = state.commander.hp + '/' + state.commander.maxHp;
-    hpRow.appendChild(hpText);
-    card.appendChild(hpRow);
-    setHpBar(hpFill, 'cmd-hp', state.commander.hp, state.commander.maxHp);
-
-    var defRow = document.createElement('div');
-    defRow.className = 'commander-bar-row';
-    defRow.innerHTML = '<span class="commander-bar-label">防</span>';
-    var defBar = document.createElement('div');
-    defBar.className = 'commander-bar def-bar';
-    var defFill = document.createElement('div');
-    defFill.className = 'commander-bar-fill def-fill';
-    defBar.appendChild(defFill);
-    defRow.appendChild(defBar);
-    var defText = document.createElement('span');
-    defText.className = 'commander-bar-text';
-    defText.textContent = state.commander.defense;
-    defRow.appendChild(defText);
-    card.appendChild(defRow);
-    setHpBar(defFill, 'cmd-def', state.commander.defense, Math.max(state.commander.maxHp, 10));
-
-    return card;
-  }
-
-  /** 轻量刷新主将卡 */
-  function refreshCommanderCard(card, state) {
-    if (!card || !state.commander) return;
-    var hpFill = card.querySelector('.hp-fill');
-    var hpText = card.querySelector('.commander-bar-text');
-    if (hpFill) setHpBar(hpFill, 'cmd-hp', state.commander.hp, state.commander.maxHp);
-    if (hpText) hpText.textContent = state.commander.hp + '/' + state.commander.maxHp;
-    var defFill = card.querySelector('.def-fill');
-    var defTexts = card.querySelectorAll('.commander-bar-text');
-    if (defFill) setHpBar(defFill, 'cmd-def', state.commander.defense, Math.max(state.commander.maxHp, 10));
-    if (defTexts.length > 1) defTexts[1].textContent = state.commander.defense;
-  }
-
   g.DSH_CardRenderer = {
     CAT_ICON: CAT_ICON,
     TARGET_TEXT: TARGET_TEXT,
     imageSrc: imageSrc,
     setHpBar: setHpBar,
     resetHpBars: resetHpBars,
-    createHandCard: createHandCard,
-    createCommanderCard: createCommanderCard,
-    refreshCommanderCard: refreshCommanderCard
+    createHandCard: createHandCard
   };
 })(typeof window !== 'undefined' ? window : globalThis);

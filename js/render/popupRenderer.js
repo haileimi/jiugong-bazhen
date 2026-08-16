@@ -171,6 +171,60 @@
     });
   }
 
+  /** 卡包检视：查看全部卡牌（每种英雄：卡包张数 / 手牌张数） */
+  function showPack(state) {
+    clear();
+    var o = overlay('pack-modal');
+    o.box.innerHTML = '<h2>🃏 卡包（' + state.pack.length + ' 张）</h2>' +
+      '<p class="modal-sub">主将之外的英雄都是招式牌；点击手牌使用，用完回卡包</p>';
+    var grid = document.createElement('div');
+    grid.className = 'pack-grid';
+    var heroIds = [];
+    state.pack.forEach(function (c) { if (heroIds.indexOf(c.heroId) < 0) heroIds.push(c.heroId); });
+    heroIds.forEach(function (hid) {
+      var h = g.DSH_HEROES.byId(hid);
+      if (!h) return;
+      var copies = state.pack.filter(function (c) { return c.heroId === hid; }).length;
+      var inHand = state.hand.filter(function (u) {
+        var c = g.DSH_GameState.getCard(state, u);
+        return c && c.heroId === hid;
+      }).length;
+      var cell = document.createElement('div');
+      cell.className = 'pack-cell pack-cat-' + h.category;
+      cell.innerHTML = '<div class="pack-icon">' + (g.DSH_CardRenderer.CAT_ICON[h.category] || '🏮') + '</div>' +
+        '<div class="pack-name">' + h.nick + ' <span class="pack-sub">' + h.name + ' · ' + h.element + '</span></div>' +
+        '<div class="pack-desc">' + h.desc + '</div>' +
+        '<div class="pack-count">卡包 ' + copies + ' 张' + (inHand > 0 ? ' · 手牌 ' + inHand + ' 张' : '') + '</div>';
+      grid.appendChild(cell);
+    });
+    o.box.appendChild(grid);
+    var btn = document.createElement('button');
+    btn.className = 'primary-btn';
+    btn.textContent = '关闭';
+    btn.addEventListener('click', function () { clear(); });
+    o.box.appendChild(btn);
+  }
+
+  /** 确认弹窗（确定 / 取消） */
+  function showConfirm(title, text, onOk, onCancel) {
+    clear();
+    var o = overlay();
+    o.box.innerHTML = '<h2>' + title + '</h2><p>' + (text || '') + '</p>';
+    var row = document.createElement('div');
+    row.className = 'confirm-row';
+    var okBtn = document.createElement('button');
+    okBtn.className = 'primary-btn';
+    okBtn.textContent = '确定';
+    okBtn.addEventListener('click', function () { clear(); if (onOk) onOk(); });
+    row.appendChild(okBtn);
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'ghost-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', function () { clear(); if (onCancel) onCancel(); });
+    row.appendChild(cancelBtn);
+    o.box.appendChild(row);
+  }
+
   /** 通用消息弹窗 */
   function showMessage(title, text, onClose) {
     clear();
@@ -193,6 +247,8 @@
     showCamp: showCamp,
     showEvent: showEvent,
     showStats: showStats,
+    showPack: showPack,
+    showConfirm: showConfirm,
     showMessage: showMessage,
     clear: clear
   };

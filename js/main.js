@@ -123,7 +123,8 @@
     if (!nodesEl) return;
     nodesEl.innerHTML = '';
     var current = firstUndoneNode();
-    state.mapNodes.forEach(function (node) {
+    // 路径倒置展示：魔王战最上面（显示顺序 boss → 事件 → 营帐 → 小怪）
+    state.mapNodes.slice().reverse().forEach(function (node) {
       var isCurrent = node === current;
       var item = document.createElement('div');
       item.className = 'map-node' + (node.done ? ' done' : '') + (isCurrent ? ' current' : '');
@@ -228,20 +229,43 @@
       endBtn.addEventListener('click', endTurn);
     }
 
-    var saveBtn = document.getElementById('map-save-btn');
-    if (saveBtn && !saveBtn.dataset.bound) {
-      saveBtn.dataset.bound = '1';
-      saveBtn.addEventListener('click', function () {
+    // 地图页顶栏：返回（保存并回首页）
+    var mapBackBtn = document.getElementById('map-back-btn');
+    if (mapBackBtn && !mapBackBtn.dataset.bound) {
+      mapBackBtn.dataset.bound = '1';
+      mapBackBtn.addEventListener('click', function () {
         g.DSH_SaveSystem.save(state);
         g.DSH_PopupRenderer.showMessage('💾 已保存', '进度已保存，返回首页', showHome);
       });
     }
 
+    // 地图页顶栏：统计
     var statsBtn = document.getElementById('map-stats-btn');
     if (statsBtn && !statsBtn.dataset.bound) {
       statsBtn.dataset.bound = '1';
       statsBtn.addEventListener('click', function () {
         g.DSH_PopupRenderer.showStats(state.bestLayer, state.layer, function () {});
+      });
+    }
+
+    // 战斗页顶栏：返回（确认后丢弃战斗数据）
+    var battleBackBtn = document.getElementById('battle-back-btn');
+    if (battleBackBtn && !battleBackBtn.dataset.bound) {
+      battleBackBtn.dataset.bound = '1';
+      battleBackBtn.addEventListener('click', function () {
+        g.DSH_PopupRenderer.showConfirm('退出战斗', '当前战斗数据会丢失，确定退出？', function () {
+          g.DSH_PopupRenderer.clear();
+          showMap();
+        });
+      });
+    }
+
+    // 战斗页顶栏：卡包检视
+    var packBtn = document.getElementById('battle-pack-btn');
+    if (packBtn && !packBtn.dataset.bound) {
+      packBtn.dataset.bound = '1';
+      packBtn.addEventListener('click', function () {
+        g.DSH_PopupRenderer.showPack(state);
       });
     }
 

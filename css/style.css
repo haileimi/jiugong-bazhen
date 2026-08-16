@@ -868,24 +868,25 @@ html, body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 手牌区（重叠） ---- */
+/* ---- 手牌区（两行：默认上 3 下 2，随张数平均分布） ---- */
 #hand-zone {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 8px 6px;
-  min-height: 130px;
+  padding: 8px 6px 6px;
+  min-height: 252px;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
   justify-content: center;
 }
-.hand-bag {
+.hand-row {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   min-height: 118px;
   width: 100%;
-  overflow: visible;
 }
 .hand-card {
   position: relative;
@@ -896,7 +897,7 @@ html, body {
   cursor: pointer;
   transition: transform 0.15s ease, z-index 0s;
 }
-.hand-card:first-child { margin-left: 0; }
+.hand-row .hand-card:first-child { margin-left: 0; }
 .hand-card:hover { transform: translateY(-8px); z-index: 6; }
 .hand-card.selected {
   transform: scale(1.2) translateY(-16px);
@@ -1072,3 +1073,190 @@ html, body {
 }
 .stats-label { color: var(--text-dim); }
 .stats-value { color: var(--gold-soft); font-weight: bold; }
+
+/* ============================================================
+   v3.1 — 顶栏 / 界河三卦 / 主将底栏 / 卡包检视
+   ============================================================ */
+/* ---- 顶栏（返回 / 标题 / 按钮 并排） ---- */
+.map-topbar,
+.battle-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.battle-topbar-title {
+  font-size: 14px;
+  color: var(--gold);
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+.topbar-btn {
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.topbar-btn:hover { border-color: var(--gold); color: var(--gold-soft); }
+
+/* ---- 界河：下卦 / 上卦 / 天命（64 卦）三行 ---- */
+#river-hex { display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.hex-line {
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.hex-line.dim { color: var(--text-dim); }
+.hex-line.tianming {
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--gold-soft);
+}
+.hex-tag {
+  display: inline-block;
+  min-width: 30px;
+  font-size: 10px;
+  color: var(--gold);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 5px;
+  padding: 0 4px;
+  margin-right: 4px;
+  text-align: center;
+}
+.hex-effect { color: var(--text-dim); }
+.hex-line.tianming .hex-effect { color: var(--gold-soft); }
+
+/* ---- 主将天赋及法宝行 ---- */
+.commander-talent-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+}
+.ct-label { color: var(--text-dim); }
+.ct-name { color: var(--gold-soft); font-weight: bold; }
+.ct-desc { color: var(--text); flex: 1; min-width: 120px; }
+.ct-divider { color: var(--border); }
+.ct-fabao { color: var(--text-dim); }
+
+/* ---- 主将底栏：头像 + 血量/防御 ---- */
+.commander-bottom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(180deg, #2c2117, #1c1510);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.15);
+}
+.commander-avatar {
+  position: relative;
+  width: 62px;
+  aspect-ratio: 3 / 4.4;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+.commander-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.commander-avatar-fb {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+.commander-avatar-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: 10px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commander-stats { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.commander-stat-row { display: flex; align-items: center; gap: 8px; }
+.cs-label { font-size: 11px; color: var(--text-dim); width: 30px; }
+.cs-text { font-size: 13px; color: var(--text); min-width: 56px; text-align: right; font-weight: bold; }
+.commander-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.commander-bar-fill { height: 100%; transition: width 0.4s ease; }
+.hp-fill { background: linear-gradient(90deg, #27ae60, #7ddfa0); }
+.def-fill { background: linear-gradient(90deg, #42a5f5, #7ec8f7); }
+
+/* ---- 卡包检视弹窗 ---- */
+.pack-modal .modal { max-width: 560px; max-height: 86vh; overflow-y: auto; }
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+.pack-cell {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.pack-cat-战斗 { border-left: 3px solid #e74c3c; }
+.pack-cat-护卫 { border-left: 3px solid #3498db; }
+.pack-cat-计谋 { border-left: 3px solid #9b59b6; }
+.pack-icon { font-size: 22px; flex: 0 0 auto; }
+.pack-name { font-size: 13px; font-weight: bold; }
+.pack-sub { font-size: 10px; color: var(--text-dim); font-weight: normal; }
+.pack-desc { font-size: 10px; color: var(--text); flex: 1; }
+.pack-count { font-size: 10px; color: var(--gold-soft); white-space: nowrap; }
+
+/* ---- 确认弹窗按钮排 ---- */
+.confirm-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+.ghost-btn {
+  padding: 10px 26px;
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ghost-btn:hover { border-color: var(--gold-soft); color: var(--gold-soft); }

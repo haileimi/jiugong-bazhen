@@ -104,7 +104,7 @@
       if (hit.kind === 'enemy') {
         elCard = document.querySelector('.enemy-card[data-enemy-id="' + hit.id + '"]');
       } else if (hit.kind === 'commander') {
-        elCard = document.querySelector('.commander-card');
+        elCard = document.querySelector('.commander-bottom');
       }
       if (elCard) {
         elCard.classList.remove('hit-flash');
@@ -124,14 +124,32 @@
     if (turnEl) turnEl.textContent = '第 ' + state.turn + ' 回合 · 第 ' + state.layer + ' 层' +
       (state.battleKind === 'boss' ? ' · 魔王战' : ' · 小怪战');
     if (hexEl) {
+      var lines = '';
+      // 下卦
+      if (state.lowerTrigram) {
+        var lo = g.DSH_TRIGRAMS.byId(state.lowerTrigram);
+        lines += '<div class="hex-line"><span class="hex-tag">下卦</span> ' + lo.symbol + lo.name +
+          '：<span class="hex-effect">' + lo.desc + '</span></div>';
+      } else {
+        lines += '<div class="hex-line dim"><span class="hex-tag">下卦</span> 未抽（第 3 回合）</div>';
+      }
+      // 上卦
+      if (state.upperTrigram) {
+        var up = g.DSH_TRIGRAMS.byId(state.upperTrigram);
+        lines += '<div class="hex-line"><span class="hex-tag">上卦</span> ' + up.symbol + up.name +
+          '：<span class="hex-effect">' + up.desc + '</span></div>';
+      } else {
+        lines += '<div class="hex-line dim"><span class="hex-tag">上卦</span> 未抽（第 5 回合）</div>';
+      }
+      // 天命（64 卦）
       if (state.currentHexagram) {
         var hex = state.currentHexagram;
-        hexEl.innerHTML = '<b>『' + hex.name + '』</b> <span class="hex-symbol">' +
-          hex.upperSymbol + hex.lowerSymbol + '</span><br><span class="hex-effect">' +
-          hex.effectText + '</span>';
+        lines += '<div class="hex-line tianming"><span class="hex-tag">天命</span> 『' + hex.name + '』 ' +
+          hex.upperSymbol + hex.lowerSymbol + '：<span class="hex-effect">' + hex.effectText + '</span></div>';
       } else {
-        hexEl.innerHTML = '<span class="hex-effect">' + g.DSH_HexSystem.hexProgressText(state) + '</span>';
+        lines += '<div class="hex-line dim"><span class="hex-tag">天命</span> 未觉醒（第 7 回合）</div>';
       }
+      hexEl.innerHTML = lines;
     }
     if (hintEl) {
       if (state.over) hintEl.textContent = state.over === 'win' ? '🏆 战斗胜利！' : '💀 主将战死……';
@@ -140,33 +158,100 @@
     }
   }
 
-  /* ---------------- 手牌区 / 主将 / 天机 ---------------- */
+  /* ---------------- 手牌区（两行：默认上 3 下 2，随数量平均分布） ---------------- */
   function renderHand(state) {
     var zone = document.getElementById('hand-zone');
     if (!zone) return;
     zone.innerHTML = '';
+    if (state.hand.length === 0) {
+      zone.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
+      return;
+    }
+    var n = state.hand.length;
+    var topCount = Math.ceil(n / 2); // 5 张 = 上 3 下 2；随张数平均分布
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
-    var bag = el('div', 'hand-bag', '');
-    state.hand.forEach(function (uid) {
-      var hero = g.DSH_GameState.cardDef(state, uid);
-      if (!hero) return;
-      var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-      if (uid === selUid) card.classList.add('selected');
-      bag.appendChild(card);
-    });
-    if (state.hand.length === 0) {
-      bag.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
+
+    function buildRow(uids, cls) {
+      var row = el('div', 'hand-row ' + cls, '');
+      uids.forEach(function (uid) {
+        var hero = g.DSH_GameState.cardDef(state, uid);
+        if (!hero) return;
+        var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
+        if (uid === selUid) card.classList.add('selected');
+        row.appendChild(card);
+      });
+      return row;
     }
-    zone.appendChild(bag);
+    zone.appendChild(buildRow(state.hand.slice(0, topCount), 'hand-row-top'));
+    zone.appendChild(buildRow(state.hand.slice(topCount), 'hand-row-bottom'));
+  }
+
+  /* ---------------- 主将天赋及法宝 / 主将底栏 ---------------- */
+  function renderCommanderTalent(state) {
+    var row = document.getElementById('commander-talent-row');
+    if (!row) return;
+    row.innerHTML = '';
+    if (!state.commander) return;
+    var def = g.DSH_HEROES.byId(state.commander.heroId);
+    var box = el('div', 'commander-talent-bar');
+    box.innerHTML = '<span class="ct-label">主将天赋</span><span class="ct-name">『' + def.talent.name + '』</span>' +
+      '<span class="ct-desc">' + def.talent.desc + '</span>' +
+      '<span class="ct-divider">｜</span><span class="ct-label">法宝</span><span class="ct-fabao">空（开发中）</span>';
+    row.appendChild(box);
   }
 
   function renderCommander(state) {
     var zone = document.getElementById('commander-zone');
     if (!zone) return;
     zone.innerHTML = '';
-    var card = g.DSH_CardRenderer.createCommanderCard(state);
-    if (card) zone.appendChild(card);
+    if (!state.commander) return;
+    var def = g.DSH_HEROES.byId(state.commander.heroId);
+
+    var bottom = el('div', 'commander-bottom');
+    // 头像
+    var avatar = el('div', 'commander-avatar');
+    var img = document.createElement('img');
+    img.className = 'commander-avatar-img';
+    img.alt = def.nick;
+    img.src = g.DSH_CardRenderer.imageSrc(def, 'default');
+    img.onerror = function () {
+      img.style.display = 'none';
+      var fb = el('div', 'commander-avatar-fb', g.DSH_CardRenderer.CAT_ICON[def.category] || '🏮');
+      avatar.appendChild(fb);
+    };
+    avatar.appendChild(img);
+    avatar.appendChild(el('div', 'commander-avatar-name', def.nick));
+    bottom.appendChild(avatar);
+
+    // 血量 / 防御
+    var stats = el('div', 'commander-stats');
+
+    var hpRow = el('div', 'commander-stat-row');
+    hpRow.appendChild(el('span', 'cs-label', '血量'));
+    var hpBar = el('div', 'commander-bar hp-bar');
+    var hpFill = el('div', 'commander-bar-fill hp-fill');
+    hpBar.appendChild(hpFill);
+    hpRow.appendChild(hpBar);
+    var hpText = el('span', 'cs-text', state.commander.hp + '/' + state.commander.maxHp);
+    hpRow.appendChild(hpText);
+    stats.appendChild(hpRow);
+
+    var defRow = el('div', 'commander-stat-row');
+    defRow.appendChild(el('span', 'cs-label', '防御'));
+    var defBar = el('div', 'commander-bar def-bar');
+    var defFill = el('div', 'commander-bar-fill def-fill');
+    defBar.appendChild(defFill);
+    defRow.appendChild(defBar);
+    var defText = el('span', 'cs-text', state.commander.defense);
+    defRow.appendChild(defText);
+    stats.appendChild(defRow);
+
+    bottom.appendChild(stats);
+    zone.appendChild(bottom);
+
+    g.DSH_CardRenderer.setHpBar(hpFill, 'cmd-hp', state.commander.hp, state.commander.maxHp);
+    g.DSH_CardRenderer.setHpBar(defFill, 'cmd-def', state.commander.defense, Math.max(state.commander.maxHp, 10));
   }
 
   function renderTianji(state) {
@@ -195,6 +280,7 @@
     renderEnemyInfo(state);
     renderEnemyRow(state);
     renderRiver(state);
+    renderCommanderTalent(state);
     renderCommander(state);
     renderHand(state);
     renderTianji(state);
@@ -388,6 +474,7 @@
     renderRiver: renderRiver,
     renderHand: renderHand,
     renderCommander: renderCommander,
+    renderCommanderTalent: renderCommanderTalent,
     renderTianji: renderTianji,
     renderEnemyInfo: renderEnemyInfo,
     renderEnemyTargets: renderEnemyTargets,
