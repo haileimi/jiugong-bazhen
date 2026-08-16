@@ -73,7 +73,14 @@
     card.dataset.heroId = hero.id;
     card.dataset.target = hero.target;
 
-    // 顶部青色横幅：左上=角色（谋士/防护/战斗）+ 诨名
+    // 左上角金色角标：数值（攻击/防御）
+    var badge = document.createElement('div');
+    badge.className = 'kc-badge';
+    badge.textContent = statNumber(hero);
+    badge.title = statText(hero);
+    card.appendChild(badge);
+
+    // 右上角青色横幅：角色（谋士/防护/战斗）+ 诨名
     var banner = document.createElement('div');
     banner.className = 'kc-banner';
     var role = document.createElement('span');
@@ -86,13 +93,6 @@
     banner.appendChild(name);
     banner.title = hero.name + ' · ' + hero.category + ' · ' + (TARGET_TEXT[hero.target] || '');
     card.appendChild(banner);
-
-    // 金色角标：右上=数值（攻击/防御）
-    var badge = document.createElement('div');
-    badge.className = 'kc-badge';
-    badge.textContent = statNumber(hero);
-    badge.title = statText(hero);
-    card.appendChild(badge);
 
     // 插画区（黑底 + 立绘 + 纹理 + 光）
     var art = document.createElement('div');

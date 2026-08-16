@@ -158,18 +158,20 @@
     }
   }
 
-  /* ---------------- 手牌区（恒定 331 宽；上排 331 / 下排 331-48=283） ----------------
+  /* ---------------- 手牌区（单排，恒定 331 宽） ----------------
    * ≤5 张：全尺寸 66px 并排；>5 张：每张缩小 20%（52.8px），叠放且总宽恒定 331
    */
   var HAND_STRIP = 331;
-  var HAND_STRIP_BOTTOM = 331 - 48;
   var HAND_CARD_FULL = 66;
   var HAND_CARD_SHRINK = 66 * 0.8; // 缩小 20%
 
   function handRowMetrics(k, strip) {
     var cardW = k <= 5 ? HAND_CARD_FULL : HAND_CARD_SHRINK;
     var overlap = 0;
-    if (cardW * k > strip) overlap = cardW - strip / k;
+    if (cardW * k > strip && k > 1) {
+      var step = (strip - cardW) / (k - 1); // 每张后移步长，保证总宽 = strip
+      overlap = cardW - step;
+    }
     return { cardW: cardW, overlap: overlap };
   }
 
@@ -181,27 +183,21 @@
       zone.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
       return;
     }
-    var n = state.hand.length;
-    var topCount = Math.ceil(n / 2); // 5 张 = 上 3 下 2；随张数平均分布
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
-    function buildRow(uids, cls, strip) {
-      var row = el('div', 'hand-row ' + cls, '');
-      var m = handRowMetrics(uids.length, strip);
-      uids.forEach(function (uid, i) {
-        var hero = g.DSH_GameState.cardDef(state, uid);
-        if (!hero) return;
-        var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-        card.style.width = m.cardW + 'px';
-        if (i > 0 && m.overlap > 0) card.style.marginLeft = (-m.overlap) + 'px';
-        if (uid === selUid) card.classList.add('selected');
-        row.appendChild(card);
-      });
-      return row;
-    }
-    zone.appendChild(buildRow(state.hand.slice(0, topCount), 'hand-row-top', HAND_STRIP));
-    zone.appendChild(buildRow(state.hand.slice(topCount), 'hand-row-bottom', HAND_STRIP_BOTTOM));
+    var row = el('div', 'hand-row', '');
+    var m = handRowMetrics(state.hand.length, HAND_STRIP);
+    state.hand.forEach(function (uid, i) {
+      var hero = g.DSH_GameState.cardDef(state, uid);
+      if (!hero) return;
+      var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
+      card.style.width = m.cardW + 'px';
+      if (i > 0 && m.overlap > 0) card.style.marginLeft = (-m.overlap) + 'px';
+      if (uid === selUid) card.classList.add('selected');
+      row.appendChild(card);
+    });
+    zone.appendChild(row);
   }
 
   /* ---------------- 主将天赋及法宝 / 主将底栏 ---------------- */

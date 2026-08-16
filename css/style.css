@@ -972,13 +972,13 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 手牌区（恒定 331 宽；两行：默认上 3 下 2，卡多则叠+缩 20%） ---- */
+/* ---- 手牌区（单排，恒定 331 宽；卡多则叠+缩 20%） ---- */
 #hand-zone {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px 0 6px;
-  min-height: 222px;
+  min-height: 118px;
   width: 331px;
   margin: 0 auto;
   display: flex;
@@ -1392,11 +1392,12 @@ body {
 .kc-banner {
   position: absolute;
   top: 0.4%;
-  left: 4%;
+  right: 4%;
+  left: auto;
   width: 58%;
   height: 16.5%;
   background: #61DAFF;
-  border-radius: 6px 0 0 0;
+  border-radius: 0 6px 0 0;
   color: #000;
   font-weight: bold;
   font-size: 9px;
@@ -1420,11 +1421,12 @@ body {
 .kc-badge {
   position: absolute;
   top: 0.4%;
-  right: 4%;
+  left: 4%;
+  right: auto;
   width: 24%;
   height: 10%;
   background: #FDC703;
-  border-radius: 0 6px 0 0;
+  border-radius: 6px 0 0 0;
   color: #000;
   font-weight: bold;
   font-size: 10px;
