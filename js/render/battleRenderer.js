@@ -287,47 +287,79 @@
     renderBattleData(state);
   }
 
-  /* ---------------- 左侧战斗数据面板 ---------------- */
+  /* ---------------- 左侧战斗数据面板（markdown 风格） ---------------- */
   function renderBattleData(state) {
     var box = document.getElementById('battle-data-content');
     if (!box) return;
     var html = '';
     var GS = g.DSH_GameState;
+    var T = g.DSH_TRIGRAMS;
 
-    html += '<div class="bd-section"><div class="bd-title">卦象节奏</div>' +
-      '<div class="bd-hex">' + g.DSH_HexSystem.hexProgressText(state) + '</div></div>';
+    // 卦象节奏
+    html += '<div class="md-h1">卦象节奏</div>';
+    var lo = state.lowerTrigram ? T.byId(state.lowerTrigram) : null;
+    var up = state.upperTrigram ? T.byId(state.upperTrigram) : null;
+    html += '<div class="md-li">下卦：' + (lo ? '<span class="hl">' + lo.symbol + lo.name + '</span> ' + lo.desc : '<span class="dim">未抽（第 3 回合）</span>') + '</div>';
+    html += '<div class="md-li">上卦：' + (up ? '<span class="hl">' + up.symbol + up.name + '</span> ' + up.desc : '<span class="dim">未抽（第 5 回合）</span>') + '</div>';
+    html += '<div class="md-li">天命：' + (state.currentHexagram
+      ? '<span class="hl">『' + state.currentHexagram.name + '』</span> ' + state.currentHexagram.effectText
+      : '<span class="dim">未觉醒（第 7 回合）</span>') + '</div>';
 
+    html += '<hr class="md-hr">';
+
+    // 天机
     var stars = '';
     for (var i = 0; i < state.maxTianji; i++) stars += i < state.tianji ? '✦' : '☆';
-    html += '<div class="bd-section"><div class="bd-title">天命 · 天机</div>' +
-      '<div class="bd-tianji">' + stars + ' (' + state.tianji + '/' + state.maxTianji + ')</div></div>';
+    html += '<div class="md-h1">天命 · 天机</div>';
+    html += '<div class="md-li">' + stars + '（' + state.tianji + '/' + state.maxTianji + '）</div>';
 
-    html += '<div class="bd-section"><div class="bd-title">主将</div>' +
-      '<div class="bd-count">' + state.commander.heroId + ' · 血 ' + state.commander.hp + '/' +
-      state.commander.maxHp + ' · 防 ' + state.commander.defense + '</div></div>';
+    html += '<hr class="md-hr">';
 
-    html += '<div class="bd-section"><div class="bd-title">手牌（' + state.hand.length + '/' + GS.HAND_MAX + '）</div>';
-    state.hand.forEach(function (uid) {
-      var hero = GS.cardDef(state, uid);
-      if (hero) {
-        html += '<div class="bd-row">' + hero.nick + ' <span class="bd-dim">' + hero.category +
-          (state.usedThisTurn[uid] ? ' ✓已用' : '') + '</span></div>';
-      }
-    });
-    html += '</div>';
+    // 战况
+    html += '<div class="md-h1">战况</div>';
+    html += '<div class="md-li">主将：<span class="hl">' + state.commander.heroId + '</span> · 血 ' + state.commander.hp +
+      '/' + state.commander.maxHp + ' · 防 ' + state.commander.defense + '</div>';
+    html += '<div class="md-li">手牌：' + state.hand.length + '/' + GS.HAND_MAX + ' 张</div>';
+    html += '<div class="md-li">卡包：' + state.pack.length + ' 张（上限 48）</div>';
+    var aliveE = GS.aliveEnemies(state).length;
+    html += '<div class="md-li">敌方：存活 ' + aliveE + ' 单位' +
+      (state.battleKind === 'boss' && GS.bossUnlocked(state) ? ' · ☠ 魔王已解锁' : '') + '</div>';
 
-    html += '<div class="bd-section"><div class="bd-title">敌方状态</div>';
+    html += '<hr class="md-hr">';
+
+    // 手牌明细
+    html += '<div class="md-h1">手牌</div>';
+    if (state.hand.length === 0) {
+      html += '<div class="md-li dim">（空）</div>';
+    } else {
+      html += '<table class="md-table"><tr><th>牌</th><th>类别</th><th>状态</th></tr>';
+      state.hand.forEach(function (uid) {
+        var hero = GS.cardDef(state, uid);
+        if (!hero) return;
+        html += '<tr><td>' + hero.nick + '</td><td>' + hero.category +
+          '</td><td>' + (state.usedThisTurn[uid] ? '已用' : '可用') + '</td></tr>';
+      });
+      html += '</table>';
+    }
+
+    html += '<hr class="md-hr">';
+
+    // 敌方状态
+    html += '<div class="md-h1">敌方状态</div>';
+    var anyEnemy = false;
     (state.boss ? [state.boss] : []).concat(state.enemies).forEach(function (e) {
       if (!e.alive || e.hp <= 0) return;
+      anyEnemy = true;
       var marks = [];
       if (state.atkDebuff[e.id]) marks.push('削弱-' + state.atkDebuff[e.id] + '%');
       if (state.burnStacks[e.id]) marks.push('🔥' + state.burnStacks[e.id]);
       if (state.windBurnLayers[e.id]) marks.push('🌪' + state.windBurnLayers[e.id]);
       if (state.frozenNext[e.id] || state.frozen[e.id]) marks.push('🧊');
-      html += '<div class="bd-row">' + (state.boss && e.id === state.boss.id ? '☠ ' : '') + e.name + ' ' +
-        e.hp + '/' + e.maxHp + (marks.length ? ' <span class="bd-dim">' + marks.join(' ') + '</span>' : '') + '</div>';
+      html += '<div class="md-li">' + (state.boss && e.id === state.boss.id ? '☠ ' : '') + e.name +
+        ' · 攻 ' + GS.enemyAtk(state, e) + ' · ' + e.hp + '/' + e.maxHp +
+        (marks.length ? ' <span class="dim">' + marks.join(' ') + '</span>' : '') + '</div>';
     });
-    html += '</div>';
+    if (!anyEnemy) html += '<div class="md-li dim">（无存活敌方）</div>';
 
     box.innerHTML = html;
   }
