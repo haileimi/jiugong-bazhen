@@ -1,0 +1,24 @@
+# 九宫八阵 · 天命牌 忽略文件
+# 纯静态项目：无 node_modules/构建产物，主要防系统与编辑器垃圾文件
+
+# 系统
+.DS_Store
+Thumbs.db
+*.log
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 防御性保留（若未来引入构建）
+node_modules/
+dist/
+build/
+
+# 密钥（本项目无，但保持习惯）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
