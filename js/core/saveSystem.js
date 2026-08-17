@@ -12,8 +12,14 @@
   var RATIONS_KEY = 'jgbz_rations_v3';
   var META_KEY = 'jgbz_meta_v3'; // 跨局持久：马蹄金 / 历史最高层（战败不清）
 
+  /** 本地日期 YYYY-MM-DD（军粮每日重置按本地日算，避免 toISOString 的 UTC 时区跨天不重置） */
   function today() {
-    return new Date().toISOString().slice(0, 10);
+    var d = new Date();
+    var m = String(d.getMonth() + 1);
+    var day = String(d.getDate());
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return d.getFullYear() + '-' + m + '-' + day;
   }
 
   /** 序列化本局可存档部分 */

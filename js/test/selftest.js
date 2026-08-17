@@ -407,6 +407,7 @@
     check('存档含层数/主将/卡包', s.layer === 2 && s.commander.heroId === 'dw1' && s.pack.length === 48);
     check('存档不含战斗状态', s.hand === undefined && s.turn === undefined);
     check('存档版本 v3', s.v === 3);
+    check('今日日期格式 YYYY-MM-DD', /^\d{4}-\d{2}-\d{2}$/.test(SS.today()));
 
     /* ============ 24. 层数成长（3 项） ============ */
     check('小怪战血量按层成长', (function () {

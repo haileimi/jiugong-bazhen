@@ -20,7 +20,7 @@ js/
 ├─ systems/              系统（卦象合成/规则引擎/战斗/经济）
 ├─ render/               渲染（招式卡与主将卡/战场/弹窗）
 ├─ input/clickController.js  点击出牌（点卡→放大摆动→点怪）
-├─ test/selftest.js      规则自检（537 项断言）
+├─ test/selftest.js      规则自检（538 项断言）
 └─ main.js               页面路由（首页→地图→战斗→奖励）+ 流程控制
 tools/run-selftest.js    Node 环境自检运行器
 tools/smoke-dom.js       DOM 冒烟测试
@@ -29,11 +29,11 @@ images/hero/<id>.png     英雄立绘（当前为程序生成占位图）
 
 ## 如何运行 / 测试
 - 运行：双击 `index.html`（建议 Chrome / Edge）
-- 规则自检：`node tools/run-selftest.js`（537 项断言：五行克制、八卦、64 卦、英雄数据、
+- 规则自检：`node tools/run-selftest.js`（538 项断言：五行克制、八卦、64 卦、英雄数据、
   卡包 48 张、出牌三分类、主将受击/免死、卦象 3/5/7 节奏、胜负判定、层数成长、
   经济系统[胜利结算/商店/招募/军粮]等）
 - DOM 冒烟：`node tools/smoke-dom.js`（首页 → 选将 → 地图 → 战斗 → 回合流转 → 军粮 → 商店/招募）
-- ⚠️ **修改任何 JS/CSS/图片后，必须同步更新 `index.html` 中的 `?v=` 版本号**（当前 = 30），
+- ⚠️ **修改任何 JS/CSS/图片后，必须同步更新 `index.html` 中的 `?v=` 版本号**（当前 = 31），
   否则浏览器缓存会导致改了不生效
 
 ## 环境变量

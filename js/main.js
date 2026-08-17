@@ -186,7 +186,8 @@
   }
 
   function renderHome() {
-    state.rations = g.DSH_SaveSystem.rationsToday();
+    state.rations = g.DSH_SaveSystem.rationsToday(); // 按本地日重新结算：跨天自动回 5
+    g.DSH_SaveSystem.setRations(state.rations);      // 写回存储，刷新后即时生效
     refreshHomeStats();
     var startBtn = document.getElementById('home-start-btn');
     if (startBtn) {

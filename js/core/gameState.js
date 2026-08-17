@@ -41,13 +41,18 @@
     ];
   }
 
-  /** 今日军粮（每日 5 点，跨天重置） */
+  /** 今日军粮（每日 5 点，按本地日期跨天重置） */
   function todayRations() {
     try {
       var raw = localStorage.getItem('jgbz_rations_v3');
       if (raw) {
         var d = JSON.parse(raw);
-        var today = new Date().toISOString().slice(0, 10);
+        var now = new Date();
+        var m = String(now.getMonth() + 1);
+        var day = String(now.getDate());
+        if (m.length < 2) m = '0' + m;
+        if (day.length < 2) day = '0' + day;
+        var today = now.getFullYear() + '-' + m + '-' + day;
         if (d.date === today) return d.value;
       }
     } catch (e) { /* 忽略 */ }
