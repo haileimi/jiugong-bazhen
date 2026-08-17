@@ -269,8 +269,14 @@
       var def = g.DSH_HEROES.byId(heroId);
       var hp = def.hp * g.DSH_GameState.COMMANDER_HP_MULT;
       state.commander = { heroId: heroId, hp: hp, maxHp: hp, defense: 0, fabao: null };
-      state.pack = g.DSH_GameState.buildPack(heroId);
+      // 卡包 = 常规偏将 ×4 + 村民 ABC 各 1 张（雇佣兵初始队友，保证入包）
+      var pack = g.DSH_GameState.buildPack(heroId);
+      g.DSH_HEROES.STARTERS.forEach(function (h) {
+        pack.push({ uid: h.id + '#x' + pack.length, heroId: h.id });
+      });
+      state.pack = pack;
       g.DSH_GameState.pushLog(state, '🏮 主将选定：' + def.nick + '（' + def.name + '）· 天赋『' + def.talent.name + '』');
+      g.DSH_GameState.pushLog(state, '🏘 村民阿大、阿二、阿三加入队伍（各自招式卡 1 张入卡包）');
       // 新手教学（流寇战）：仅第一次跑（meta.tutored），之后直接选路线
       var meta = g.DSH_SaveSystem.getMeta();
       if (meta.tutored) {

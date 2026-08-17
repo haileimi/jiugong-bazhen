@@ -158,8 +158,15 @@
       check('英雄 ' + h.id + ' 主将血量>0', h.hp > 0);
       catSet[h.category] = true;
     });
-    check('英雄共 16 名', H.HEROES.length === 16);
-    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 16);
+    check('英雄共 19 名（16 常规 + 村民 3）', H.HEROES.length === 19);
+    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 19);
+    check('全英雄卡字段完整（攻/防/种类/血/技能/天赋/名/诨号/立绘/头像/关键值/简介/五行/善恶/速/射程）', H.HEROES.every(function (h) {
+      return h.id && h.nick && h.name && h.category && h.element && h.hp > 0 && h.desc &&
+        h.attack !== undefined && h.defense !== undefined && h.alignment !== undefined &&
+        h.speed > 0 && h.range > 0 && h.portrait && h.avatar &&
+        (typeof h.skill === 'object' || h.skill === null) && !!h.talent && typeof h.talent.name === 'string' &&
+        typeof h.talent.type === 'string';
+    }));
     check('三类齐全：战斗', catSet['战斗'] === true);
     check('三类齐全：护卫', catSet['护卫'] === true);
     check('三类齐全：计谋', catSet['计谋'] === true);
@@ -237,9 +244,9 @@
     check('节点顺序 小怪/营帐/事件/魔王', st.mapNodes.map(function (n) { return n.type; }).join(',') === 'monster,camp,event,boss');
     check('初始无主将/无卡包', st.commander === null && st.pack.length === 0);
 
-    /* ============ 11. 卡包构建（8 项） ============ */
+    /* ============ 11. 卡包构建（10 项） ============ */
     var pack = GS.buildPack('wz1');
-    check('卡包 60 张（16 英雄 × 4）', pack.length === 60);
+    check('卡包 60 张（15 常规偏将 × 4）', pack.length === 60);
     check('主将不出现在卡包', pack.every(function (c) { return c.heroId !== 'wz1'; }));
     check('卡包含 15 种偏将', new Set(pack.map(function (c) { return c.heroId; })).size === 15);
     check('每种 4 张', pack.filter(function (c) { return c.heroId === 'gs1'; }).length === 4);
@@ -251,6 +258,14 @@
     check('新卡 3 名偏将入卡包', ['wz4', 'qb4', 'ms3'].every(function (id) {
       return pack.some(function (c) { return c.heroId === id; });
     }));
+    check('村民 3 人在册且为 starter', H.STARTERS.length === 3 &&
+      ['cm1', 'cm2', 'cm3'].every(function (id) { return !!H.byId(id) && H.byId(id).starter; }));
+    check('村民不入常规卡池', !pack.some(function (c) { return c.heroId === 'cm1' || c.heroId === 'cm2' || c.heroId === 'cm3'; }));
+    check('新局卡包 63 张（60 + 村民各 1）', (function () {
+      var p = GS.buildPack('wz1');
+      H.STARTERS.forEach(function (h) { p.push({ uid: h.id + '#x' + p.length, heroId: h.id }); });
+      return p.length === 63 && new Set(p.map(function (c) { return c.uid; })).size === 63;
+    })());
 
     /* ============ 12. 战斗开始（9 项） ============ */
     var b1 = setupMonsterBattle([0.5]);
@@ -585,6 +600,26 @@
     check('中立结算：+30 金', w6.gold === 30);
     check('善恶名号映射', EC.alignmentTitle(-10) === '恶徒 · 邪恶' && EC.alignmentTitle(10) === '义士 · 正义' &&
       EC.alignmentTitle(0) === '中立佣兵');
+
+    // 全角色卡牌模型：敌方也是完整英雄字段
+    check('敌方全角色字段完整（攻/防/种类/血/技能/天赋/善恶/速/射程）', (function () {
+      var all = EN.GENERALS.concat(EN.GUANJUN).concat(EN.BANDITS).concat([EN.BOSS, EN.BOSS_GOOD]);
+      return all.every(function (e) {
+        var v = EN.heroView(e);
+        return v.id && v.name && v.nick && v.category && v.element && v.hp > 0 &&
+          v.attack === e.atk && v.defense !== undefined && v.alignment !== undefined &&
+          v.speed > 0 && v.range > 0 && v.portrait && v.desc;
+      });
+    })());
+    check('善恶值不清零：结算/奖励/战斗都不改善恶', (function () {
+      var s = setupEconomy([0.5]).st;
+      s.alignment = -10;
+      var before = s.alignment;
+      EC.settleAlignment(s);
+      EC.victoryRewards(s);
+      s.alignment = before;
+      return s.alignment === -10;
+    })());
 
     /* ============ 汇总 ============ */
     details = assert.slice();

@@ -135,7 +135,7 @@ if (!dwPick) { console.error('✗ 未找到穆奎选将卡'); process.exit(1); }
 dwPick.click();
 const app = sandbox.DSH_APP;
 const st = app.getState();
-if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 60) {
+if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 63) {
   console.error('✗ 主将/卡包初始化错误');
   process.exit(1);
 }
@@ -148,7 +148,7 @@ if (!pageBattle || pageBattle.style.display === 'none' || st.battleKind !== 'tut
   console.error('✗ 教学战未开始（kind=' + st.battleKind + ' 敌=' + (st.enemies || []).length + '）');
   process.exit(1);
 }
-console.log('✓ 主将选定穆奎，卡包 60 张，流寇教学战开始（敌方 ' + st.enemies.length + ' 个）');
+console.log('✓ 主将选定穆奎，卡包 63 张（含村民 ABC），流寇教学战开始（敌方 ' + st.enemies.length + ' 个）');
 
 // 4. 强制打赢教学战 → 村子得救 → 路线选择 → 进入地图
 app.forceWin();

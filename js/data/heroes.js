@@ -98,21 +98,51 @@
     { id: 'ms3', nick: '点星笔', name: '文若',   category: '计谋', element: '木', target: 'self',
       draw: 3, desc: '抽 3 张牌',
       talent: { name: '神笔', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
-      hp: 9, skins: [{ id: 'default', name: '原版' }] }
+      hp: 9, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- v3.10 村民 ABC（雇佣兵初始队友：每局保证入包，不可当主将） ---------- */
+    { id: 'cm1', nick: '阿大', name: '猎户阿大', category: '战斗', element: '木', target: 'single',
+      damage: 8, desc: '对目标造成 8 点伤害，20% 暴击 ×1.5',
+      skill: { name: '猎户一击', chance: 0.2, critDmg: 1.5 },
+      talent: { name: '猎户本能', desc: '战斗牌伤害 +5%', type: 'battlePct', value: 5 },
+      hp: 6, defense: 1, alignment: 2, speed: 5, range: 1, starter: true, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'cm2', nick: '阿二', name: '药童阿二', category: '护卫', element: '木', target: 'self',
+      defGain: 6, heal: 2, desc: '获得 6 点防御，恢复 2 点血量',
+      talent: { name: '采药', desc: '每回合结束恢复 1 点血量', type: 'endHeal', value: 1 },
+      hp: 8, defense: 2, alignment: 2, speed: 5, range: 1, starter: true, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'cm3', nick: '阿三', name: '账房阿三', category: '计谋', element: '水', target: 'self',
+      draw: 2, desc: '抽 2 张牌',
+      talent: { name: '精打细算', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
+      hp: 7, defense: 1, alignment: 2, speed: 5, range: 3, starter: true, skins: [{ id: 'default', name: '原版' }] }
   ];
 
-  /** 只读视图展开 */
+  /**
+   * 只读视图展开（v3.10 全角色卡牌模型：攻击/防御/种类/血量/技能/天赋/姓名/诨号/
+   * 立绘/头像/关键数值/简介/五行/善恶值/速度/射程）。
+   * 缺省值：攻击=damage，防御（护卫 2 / 其他 1），善恶=0，速度=5，射程（战斗 1 / 其他 3），
+   * 立绘/头像=占位图路径。
+   */
   var VIEW = HEROES.map(function (h) {
+    var defaultRange = h.range !== undefined ? h.range : (h.category === '战斗' ? 1 : 3);
+    var portrait = 'images/hero/' + h.id + '/default.png';
     return {
       id: h.id, nick: h.nick, name: h.name,
       category: h.category, element: h.element, target: h.target,
       desc: h.desc, hp: h.hp,
+      attack: h.damage || 0,                       // 攻击
+      defense: h.defense !== undefined ? h.defense : (h.category === '护卫' ? 2 : 1), // 防御
+      alignment: h.alignment !== undefined ? h.alignment : 0, // 善恶值（-10~+10）
+      speed: h.speed || 5,                         // 速度
+      range: defaultRange,                         // 射程
+      portrait: h.portrait || portrait,            // 立绘
+      avatar: h.avatar || portrait,                // 头像
       damage: h.damage || 0,
       defGain: h.defGain || 0, heal: h.heal || 0,
       atkDown: h.atkDown || 0, wind: h.wind || 0, draw: h.draw || 0,
       tianjiUp: h.tianjiUp || 0, fillHand: !!h.fillHand,
       skill: h.skill || null,
       talent: h.talent,
+      starter: !!h.starter,                        // 村民等初始角色：不入普通卡池
       skins: h.skins.map(function (s) { return { id: s.id, name: s.name, file: s.id + '.png' }; })
     };
   });
@@ -137,9 +167,12 @@
     skinsOf: skinsOf,
     defaultSkinId: defaultSkinId,
     skinOf: skinOf,
-    /** 卡包牌型：主将之外的全部英雄（偏将=招式） */
+    /** 初始队友（村民等 starter）：每局保证入包 */
+    STARTERS: VIEW.filter(function (h) { return h.starter; }),
+    /** 卡包牌型：主将之外的非 starter 英雄（偏将=招式） */
     packHeroIds: function (commanderId) {
-      return VIEW.filter(function (h) { return h.id !== commanderId; }).map(function (h) { return h.id; });
+      return VIEW.filter(function (h) { return h.id !== commanderId && !h.starter; })
+        .map(function (h) { return h.id; });
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

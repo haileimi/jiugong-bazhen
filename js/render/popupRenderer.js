@@ -25,7 +25,7 @@
     return { overlay: overlay, box: box };
   }
 
-  /** 开局选主将（16 名英雄任选其一） */
+  /** 开局选主将（16 名英雄任选其一；村民等初始角色不可选） */
   function showCommanderPick(onPick) {
     clear();
     var o = overlay('pick-modal');
@@ -33,6 +33,7 @@
     var grid = document.createElement('div');
     grid.className = 'pick-grid';
     g.DSH_HEROES.HEROES.forEach(function (h) {
+      if (h.starter) return; // 村民是初始队友，不可当主将
       var card = document.createElement('button');
       card.className = 'pick-card pick-cat-' + h.category;
       var cmdHp = h.hp * g.DSH_GameState.COMMANDER_HP_MULT;

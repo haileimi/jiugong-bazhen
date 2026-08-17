@@ -16,13 +16,15 @@
     return e;
   }
 
-  /* ---------------- 敌方卡 ---------------- */
+  /* ---------------- 敌方卡（v3.10 英雄卡风格：种类符号 + 攻/防） ---------------- */
   function createEnemyCard(enemy, state, isBoss) {
     var card = el('div', 'enemy-card' + (enemy.hp <= 0 ? ' dead' : '') + (isBoss ? ' boss-lg' : ''));
     card.dataset.enemyId = enemy.id;
+    var ev = g.DSH_ENEMIES.heroView(enemy); // 完整英雄视图
 
     var nameRow = el('div', 'enemy-name');
     nameRow.appendChild(el('span', 'enemy-element', g.DSH_ELEMENTS.ICON[enemy.element]));
+    nameRow.appendChild(el('span', 'enemy-cat', g.DSH_CardRenderer.CAT_ICON[enemy.category] || '?'));
     nameRow.appendChild(el('span', '', enemy.name));
     if (isBoss) {
       var guard = g.DSH_GameState.bossUnlocked(state)
@@ -33,6 +35,7 @@
     card.appendChild(nameRow);
 
     var atkLine = el('div', 'enemy-atk', '攻 ' + g.DSH_GameState.enemyAtk(state, enemy) +
+      ' 防 ' + (ev.defense || 0) +
       (enemy.aoe ? '·全体' : '') + (state.atkDebuff[enemy.id] ? '·削' + state.atkDebuff[enemy.id] + '%' : ''));
     card.appendChild(atkLine);
 
