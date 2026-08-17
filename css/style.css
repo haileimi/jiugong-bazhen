@@ -997,17 +997,54 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 副将区（手牌，5×3 网格，与其他模块同宽） ---- */
+/* ---- 副将区（手牌，5×3 分排：近战/远程/谋略，与其他模块同宽） ---- */
 #hand-zone {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 5px;
   padding: 6px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   min-height: 0;
+}
+
+/* 部门排：近战部⚔️ / 远程部🏹 / 谋略部🪶（符号浅浅地衬在背景上） */
+.dept-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+.dept-row .grid-cell { position: relative; z-index: 1; }
+.dept-symbol {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 44px;
+  line-height: 1;
+  opacity: 0.10;
+  pointer-events: none;
+  z-index: 0;
+}
+.dept-label {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  font-size: 8px;
+  color: var(--text-dim);
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 2;
+  letter-spacing: 1px;
+}
+.hand-empty-note {
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 6px 0;
+  text-align: center;
 }
 
 /* 简约 1:1 方形招式卡 */

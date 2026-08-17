@@ -149,34 +149,50 @@
     }
   }
 
-  /* ---------------- 副将区（手牌，5×3 网格，最多 9 张） ---------------- */
+  /* ---------------- 副将区（手牌，5×3 分排：近战/远程/谋略，按定位归排居中） ---------------- */
+  var DEPTS = [
+    { cat: '战斗', name: '近战部', symbol: '⚔️' },
+    { cat: '护卫', name: '远程部', symbol: '🏹' },
+    { cat: '计谋', name: '谋略部', symbol: '🪶' }
+  ];
+
   function renderHand(state) {
-    var grid = document.getElementById('hand-zone');
-    if (!grid) return;
-    grid.innerHTML = '';
+    var zone = document.getElementById('hand-zone');
+    if (!zone) return;
+    zone.innerHTML = '';
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
-    for (var c = 0; c < 15; c++) {
-      var cell = el('div', 'grid-cell');
-      if (c < state.hand.length) {
-        var uid = state.hand[c];
-        var hero = g.DSH_GameState.cardDef(state, uid);
-        if (hero) {
-          var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-          if (uid === selUid) card.classList.add('selected');
+    if (state.hand.length === 0) {
+      zone.appendChild(el('div', 'hand-empty-note', '手牌已空（回合结束自动补 5 张）'));
+    }
+
+    DEPTS.forEach(function (dept) {
+      var cards = state.hand.map(function (uid) {
+        return { uid: uid, hero: g.DSH_GameState.cardDef(state, uid) };
+      }).filter(function (c) { return c.hero && c.hero.category === dept.cat; });
+
+      var row = el('div', 'dept-row dept-' + dept.cat);
+      row.appendChild(el('span', 'dept-symbol', dept.symbol));
+      row.appendChild(el('span', 'dept-label', dept.name));
+
+      // 居中排列（5 格内居中）
+      var start = Math.max(0, Math.floor((5 - cards.length) / 2));
+      for (var c = 0; c < 5; c++) {
+        var cell = el('div', 'grid-cell');
+        var idx = c - start;
+        if (idx >= 0 && idx < cards.length) {
+          var card = g.DSH_CardRenderer.createHandCard(cards[idx].hero, state, cards[idx].uid);
+          if (cards[idx].uid === selUid) card.classList.add('selected');
           cell.appendChild(card);
         } else {
           cell.classList.add('empty');
+          cell.appendChild(el('div', 'cell-dot', '·'));
         }
-      } else if (state.hand.length === 0 && c === 7) {
-        cell.classList.add('empty', 'note');
-        cell.textContent = '手牌已空';
-      } else {
-        cell.classList.add('empty');
+        row.appendChild(cell);
       }
-      grid.appendChild(cell);
-    }
+      zone.appendChild(row);
+    });
   }
 
   /* ---------------- 主将天赋及法宝 / 主将底栏 ---------------- */
