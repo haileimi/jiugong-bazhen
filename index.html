@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>九宫八阵 · 天命牌</title>
-  <link rel="stylesheet" href="css/style.css?v=34">
+  <link rel="stylesheet" href="css/style.css?v=35">
 </head>
 <body>
   <div id="app">
@@ -69,7 +69,10 @@
           <button id="battle-pack-btn" class="topbar-btn" type="button">🃏 卡包</button>
         </div>
 
-        <!-- 小鬼区：9宫格敌方（魔王本体在中央格） -->
+        <!-- 魔王区：魔王本体独占最上排（仅魔王战） -->
+        <section id="boss-zone"></section>
+
+        <!-- 小鬼区：5×3 敌方（按镜像部门分排） -->
         <section id="enemy-zone">
           <div id="enemy-row"></div>
         </section>
@@ -101,30 +104,30 @@
   <div id="modal-root"></div>
 
   <!-- 数据层 -->
-  <script src="js/data/elements.js?v=34"></script>
-  <script src="js/data/heroes.js?v=34"></script>
-  <script src="js/data/trigram.js?v=34"></script>
-  <script src="js/data/enemies.js?v=34"></script>
-  <script src="js/data/hex64.js?v=34"></script>
+  <script src="js/data/elements.js?v=35"></script>
+  <script src="js/data/heroes.js?v=35"></script>
+  <script src="js/data/trigram.js?v=35"></script>
+  <script src="js/data/enemies.js?v=35"></script>
+  <script src="js/data/hex64.js?v=35"></script>
   <!-- 核心 -->
-  <script src="js/core/eventSystem.js?v=34"></script>
-  <script src="js/core/gameState.js?v=34"></script>
-  <script src="js/core/saveSystem.js?v=34"></script>
-  <script src="js/core/turnSystem.js?v=34"></script>
+  <script src="js/core/eventSystem.js?v=35"></script>
+  <script src="js/core/gameState.js?v=35"></script>
+  <script src="js/core/saveSystem.js?v=35"></script>
+  <script src="js/core/turnSystem.js?v=35"></script>
   <!-- 系统 -->
-  <script src="js/systems/hexSystem.js?v=34"></script>
-  <script src="js/systems/ruleSystem.js?v=34"></script>
-  <script src="js/systems/battleSystem.js?v=34"></script>
-  <script src="js/systems/economySystem.js?v=34"></script>
+  <script src="js/systems/hexSystem.js?v=35"></script>
+  <script src="js/systems/ruleSystem.js?v=35"></script>
+  <script src="js/systems/battleSystem.js?v=35"></script>
+  <script src="js/systems/economySystem.js?v=35"></script>
   <!-- 渲染 -->
-  <script src="js/render/cardRenderer.js?v=34"></script>
-  <script src="js/render/battleRenderer.js?v=34"></script>
-  <script src="js/render/popupRenderer.js?v=34"></script>
+  <script src="js/render/cardRenderer.js?v=35"></script>
+  <script src="js/render/battleRenderer.js?v=35"></script>
+  <script src="js/render/popupRenderer.js?v=35"></script>
   <!-- 交互 -->
-  <script src="js/input/clickController.js?v=34"></script>
+  <script src="js/input/clickController.js?v=35"></script>
   <!-- 自检 -->
-  <script src="js/test/selftest.js?v=34"></script>
+  <script src="js/test/selftest.js?v=35"></script>
   <!-- 入口 -->
-  <script src="js/main.js?v=34"></script>
+  <script src="js/main.js?v=35"></script>
 </body>
 </html>

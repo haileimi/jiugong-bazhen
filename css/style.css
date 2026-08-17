@@ -185,6 +185,14 @@ body {
 .grid-cell.empty .cell-dot { color: rgba(154, 138, 106, 0.35); font-size: 14px; }
 .grid-cell.note { color: var(--text-dim); font-size: 10px; text-align: center; }
 
+/* ---- 魔王区（独立于棋盘最上排，仅魔王战） ---- */
+#boss-zone {
+  width: 100%;
+}
+#boss-zone .enemy-card.boss-lg {
+  flex: none;
+}
+
 /* ---- 小鬼区：5×3 敌方（与其他模块同宽） ---- */
 #enemy-zone {
   width: 100%;

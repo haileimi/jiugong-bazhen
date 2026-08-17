@@ -33,7 +33,7 @@ images/hero/<id>.png     英雄立绘（当前为程序生成占位图）
   卡包 48 张、出牌三分类、主将受击/免死、卦象 3/5/7 节奏、胜负判定、层数成长、
   经济系统[胜利结算/商店/招募/军粮]等）
 - DOM 冒烟：`node tools/smoke-dom.js`（首页 → 选将 → 地图 → 战斗 → 回合流转 → 军粮 → 商店/招募）
-- ⚠️ **修改任何 JS/CSS/图片后，必须同步更新 `index.html` 中的 `?v=` 版本号**（当前 = 34），
+- ⚠️ **修改任何 JS/CSS/图片后，必须同步更新 `index.html` 中的 `?v=` 版本号**（当前 = 35），
   否则浏览器缓存会导致改了不生效
 
 ## 环境变量
@@ -50,8 +50,8 @@ images/hero/<id>.png     英雄立绘（当前为程序生成占位图）
   魔王本体第 2 行居中、5 魔将第 1 行，小怪战 2 只第 1 行；手牌上限 9（`gameState.HAND_MAX`）
 - 部门区（v3.10）：我军（副将区）上→下 近战部⚔️(战斗)/远程部🏹(护卫)/谋略部🪶(计谋)；
   敌军（小鬼区）**垂直镜像** 上→下 谋略部🪶/远程部🏹/近战部⚔️（同部门隔界河相对）；
-  符号浅衬背景，排内 5 格居中；魔王本体居敌方近战部中央（`battleRenderer.DEPTS` / `ENEMY_DEPTS`，
-  敌方 category 在 `enemies.js`，`turnSystem.buildEnemies` 复制）
+  符号浅衬背景，排内 5 格居中；**魔王本体独占最上排魔王区**（`renderBossZone`→`#boss-zone`，boss-lg 大卡），
+  不在小鬼区格位（`battleRenderer.DEPTS` / `ENEMY_DEPTS`，敌方 category 在 `enemies.js`，`turnSystem.buildEnemies` 复制）
 - 卡面（v3.10）：简约 **1:1 方形**招式卡（⚔/🛡/🔮 类别符号 + 诨名 + 效果），无立绘、无 kc-card；
   界河只显示「回合/层数」+ 已抽到的卦象（无卦不占位）
 - 改规则必须跑自检：`node tools/run-selftest.js` + 冒烟 `node tools/smoke-dom.js`

@@ -70,7 +70,21 @@
     { cat: '战斗', name: '近战部', symbol: '⚔️' }
   ];
 
-  /** 小鬼区：5×3 敌方（按定位归镜像部门，排内居中；魔王本体居近战部中央） */
+  /** 魔王区：魔王本体独占最上排大卡（仅魔王战） */
+  function renderBossZone(state) {
+    var zone = document.getElementById('boss-zone');
+    if (!zone) return;
+    zone.innerHTML = '';
+    if (state.battleKind !== 'boss' || !state.boss) return;
+    var bossCard = createEnemyCard(state.boss, state, true);
+    bossCard.classList.add('boss-card');
+    if (g.DSH_GameState.bossUnlocked(state) && state.boss.hp > 0) {
+      bossCard.classList.add('boss-unlocked', 'targetable');
+    }
+    zone.appendChild(bossCard);
+  }
+
+  /** 小鬼区：5×3 敌方（5 魔将按定位归镜像部门，排内居中） */
   function renderEnemyRow(state) {
     var zone = document.getElementById('enemy-row');
     if (!zone) return;
@@ -78,22 +92,9 @@
 
     ENEMY_DEPTS.forEach(function (dept) {
       var units = [];
-      if (state.battleKind === 'boss' && state.boss && (state.boss.category || '战斗') === dept.cat) {
-        units.push({ e: state.boss, boss: true });
-      }
       state.enemies.forEach(function (e) {
         if ((e.category || '战斗') === dept.cat) units.push({ e: e, boss: false });
       });
-      // 魔王本体居中（近战部内）
-      if (dept.cat === '战斗' && units.length > 1) {
-        for (var k = 0; k < units.length; k++) {
-          if (units[k].boss) {
-            var u = units.splice(k, 1)[0];
-            units.splice(Math.floor(units.length / 2), 0, u);
-            break;
-          }
-        }
-      }
 
       var row = el('div', 'dept-row dept-' + dept.cat);
       row.appendChild(el('span', 'dept-symbol', dept.symbol));
@@ -105,8 +106,7 @@
         var idx = c - start;
         if (idx >= 0 && idx < units.length) {
           var u = units[idx];
-          var card = createEnemyCard(u.e, state, u.boss);
-          if (u.boss) card.classList.add('boss-card');
+          var card = createEnemyCard(u.e, state, false);
           if (g.DSH_GameState.enemyAlive(state, u.e.id)) card.classList.add('targetable');
           cell.appendChild(card);
         } else {
@@ -309,6 +309,7 @@
   }
 
   function renderAll(state) {
+    renderBossZone(state);
     renderEnemyRow(state);
     renderRiver(state);
     renderCommander(state);
@@ -531,6 +532,7 @@
     TABS: TABS,
     createEnemyCard: createEnemyCard,
     renderAll: renderAll,
+    renderBossZone: renderBossZone,
     renderEnemyRow: renderEnemyRow,
     renderRiver: renderRiver,
     renderHand: renderHand,
