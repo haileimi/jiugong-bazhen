@@ -1,102 +1,101 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>涔濆鍏樀 路 澶╁懡鐗?/title>
-  <link rel="stylesheet" href="css/style.css?v=26">
+  <title>九宫八阵 · 天命牌</title>
+  <link rel="stylesheet" href="css/style.css?v=28">
 </head>
 <body>
   <div id="app">
-    <!-- 宸︿晶锛氭垬鏂楁暟鎹紙鍔ㄦ€佷几缂╋級 -->
+    <!-- 左侧：战斗数据（动态伸缩） -->
     <aside id="battle-data">
-      <div id="battle-data-title">鈿?鎴樻枟鏁版嵁</div>
+      <div id="battle-data-title">⚔ 战斗数据</div>
       <div id="battle-data-content"></div>
     </aside>
 
-    <!-- 涓绘垬鍦猴紙375px 鍥哄畾锛屽眳涓級 -->
+    <!-- 主战场（375px 固定，居中） -->
     <main id="battlefield">
 
-      <!-- ============ 棣栭〉 ============ -->
+      <!-- ============ 首页 ============ -->
       <section id="page-home" class="page">
         <div class="home-box">
-          <h1 class="home-title">涔濆鍏樀 路 澶╁懡鐗?/h1>
-          <p class="home-sub">v3 涓诲皢鍒?路 涓€璺墦鎬?路 澶╁懡 64 鍗?/p>
+          <h1 class="home-title">九宫八阵 · 天命牌</h1>
+          <p class="home-sub">v3 主将制 · 一路打怪 · 天命 64 卦</p>
 
           <div class="home-stats">
             <div class="home-stat">
-              <span class="home-stat-icon">馃挵</span>
+              <span class="home-stat-icon">💰</span>
               <div>
-                <div class="home-stat-label">椹箘閲?/div>
+                <div class="home-stat-label">马蹄金</div>
                 <div class="home-stat-value" id="home-gold">0</div>
               </div>
             </div>
             <div class="home-stat">
-              <span class="home-stat-icon">馃崥</span>
+              <span class="home-stat-icon">🍚</span>
               <div>
-                <div class="home-stat-label">鍐涚伯锛堟瘡鏃?5 鐐癸級</div>
+                <div class="home-stat-label">军粮（每日 5 点）</div>
                 <div class="home-stat-value" id="home-rations">5/5</div>
               </div>
             </div>
           </div>
 
-          <button id="home-start-btn" class="big-btn" type="button">寮€濮嬫垬鏂?/button>
+          <button id="home-start-btn" class="big-btn" type="button">开始战斗</button>
 
           <div class="home-extra">
-            <button id="home-shop-btn" class="mid-btn" type="button">馃彧 鍟嗗簵</button>
-            <button id="home-recruit-btn" class="mid-btn" type="button">馃彯 鎷涘嫙鎵€</button>
+            <button id="home-shop-btn" class="mid-btn" type="button">🏪 商店</button>
+            <button id="home-recruit-btn" class="mid-btn" type="button">🏮 招募所</button>
           </div>
         </div>
       </section>
 
-      <!-- ============ 鍦板浘椤?============ -->
+      <!-- ============ 地图页 ============ -->
       <section id="page-map" class="page">
         <div class="map-box">
           <div class="map-topbar">
-            <button id="map-back-btn" class="topbar-btn" type="button">鈫?杩斿洖</button>
-            <span id="map-layer" class="map-layer">绗?1 灞?/span>
-            <button id="map-stats-btn" class="topbar-btn" type="button">馃搳 缁熻</button>
+            <button id="map-back-btn" class="topbar-btn" type="button">← 返回</button>
+            <span id="map-layer" class="map-layer">第 1 层</span>
+            <button id="map-stats-btn" class="topbar-btn" type="button">📊 统计</button>
           </div>
           <div id="map-nodes" class="map-nodes"></div>
         </div>
       </section>
 
-      <!-- ============ 鎴樻枟椤?============ -->
+      <!-- ============ 战斗页（战场 5 区：魔王 / 小鬼 / 界河 / 副将 / 主将） ============ -->
       <section id="page-battle" class="page">
         <div class="battle-topbar">
-          <button id="battle-back-btn" class="topbar-btn" type="button">鈫?杩斿洖</button>
-          <span class="battle-topbar-title">鈿?鎴樻枟</span>
-          <button id="battle-pack-btn" class="topbar-btn" type="button">馃儚 鍗″寘</button>
+          <button id="battle-back-btn" class="topbar-btn" type="button">← 返回</button>
+          <span class="battle-topbar-title">⚔ 战斗</span>
+          <button id="battle-pack-btn" class="topbar-btn" type="button">🃏 卡包</button>
         </div>
 
-        <div id="enemy-info"></div>
+        <!-- 魔王区（仅魔王战显示） -->
+        <section id="boss-zone"></section>
 
+        <!-- 小鬼区：敌方小怪 -->
         <section id="enemy-zone">
           <div id="enemy-row"></div>
         </section>
 
+        <!-- 界河区：信息（回合 / 卦象节奏 / 提示） -->
         <section id="river">
           <div id="river-turn" class="river-item"></div>
           <div id="river-hex" class="river-item"></div>
           <div id="river-hint" class="river-item hint"></div>
         </section>
 
-        <section id="tianji-row">
-          <span id="tianji-text"></span>
-        </section>
-
+        <!-- 副将区：手牌（与小鬼区对立） -->
         <section id="hand-zone"></section>
 
-        <section id="commander-talent-row"></section>
-
+        <!-- 主将区：头像 / 名字 / 法宝 / 血量 / 防御 / 卡包 / 天机 -->
         <section id="commander-zone"></section>
 
-        <button id="end-turn-btn" type="button">鍥炲悎瀹屾瘯</button>
+        <button id="end-turn-btn" type="button">回合完毕</button>
       </section>
 
     </main>
 
-    <!-- 鍙充晶璋冭瘯鍖猴紙鍔ㄦ€佷几缂╋級 -->
+    <!-- 右侧调试区（动态伸缩） -->
     <aside id="debug-panel">
       <div id="debug-tabs"></div>
       <div id="debug-content"></div>
@@ -105,31 +104,31 @@
 
   <div id="modal-root"></div>
 
-  <!-- 鏁版嵁灞?-->
-  <script src="js/data/elements.js?v=26"></script>
-  <script src="js/data/heroes.js?v=26"></script>
-  <script src="js/data/trigram.js?v=26"></script>
-  <script src="js/data/enemies.js?v=26"></script>
-  <script src="js/data/hex64.js?v=26"></script>
-  <!-- 鏍稿績 -->
-  <script src="js/core/eventSystem.js?v=26"></script>
-  <script src="js/core/gameState.js?v=26"></script>
-  <script src="js/core/saveSystem.js?v=26"></script>
-  <script src="js/core/turnSystem.js?v=26"></script>
-  <!-- 绯荤粺 -->
-  <script src="js/systems/hexSystem.js?v=26"></script>
-  <script src="js/systems/ruleSystem.js?v=26"></script>
-  <script src="js/systems/battleSystem.js?v=26"></script>
-  <script src="js/systems/economySystem.js?v=26"></script>
-  <!-- 娓叉煋 -->
-  <script src="js/render/cardRenderer.js?v=26"></script>
-  <script src="js/render/battleRenderer.js?v=26"></script>
-  <script src="js/render/popupRenderer.js?v=26"></script>
-  <!-- 浜や簰 -->
-  <script src="js/input/clickController.js?v=26"></script>
-  <!-- 鑷 -->
-  <script src="js/test/selftest.js?v=26"></script>
-  <!-- 鍏ュ彛 -->
-  <script src="js/main.js?v=26"></script>
+  <!-- 数据层 -->
+  <script src="js/data/elements.js?v=28"></script>
+  <script src="js/data/heroes.js?v=28"></script>
+  <script src="js/data/trigram.js?v=28"></script>
+  <script src="js/data/enemies.js?v=28"></script>
+  <script src="js/data/hex64.js?v=28"></script>
+  <!-- 核心 -->
+  <script src="js/core/eventSystem.js?v=28"></script>
+  <script src="js/core/gameState.js?v=28"></script>
+  <script src="js/core/saveSystem.js?v=28"></script>
+  <script src="js/core/turnSystem.js?v=28"></script>
+  <!-- 系统 -->
+  <script src="js/systems/hexSystem.js?v=28"></script>
+  <script src="js/systems/ruleSystem.js?v=28"></script>
+  <script src="js/systems/battleSystem.js?v=28"></script>
+  <script src="js/systems/economySystem.js?v=28"></script>
+  <!-- 渲染 -->
+  <script src="js/render/cardRenderer.js?v=28"></script>
+  <script src="js/render/battleRenderer.js?v=28"></script>
+  <script src="js/render/popupRenderer.js?v=28"></script>
+  <!-- 交互 -->
+  <script src="js/input/clickController.js?v=28"></script>
+  <!-- 自检 -->
+  <script src="js/test/selftest.js?v=28"></script>
+  <!-- 入口 -->
+  <script src="js/main.js?v=28"></script>
 </body>
 </html>
