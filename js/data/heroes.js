@@ -1,5 +1,5 @@
 /**
- * heroes.js — 13 名英雄（v3 主将制）
+ * heroes.js — 16 名英雄（v3 主将制）
  *
  * 每名英雄既可当「主将」（有血量、被怪打、带被动天赋），也可作为「偏将」（招式牌进卡包）。
  * 类别（与五行脱钩，五行只做克制结算）：
@@ -83,7 +83,22 @@
     { id: 'bz1', nick: '白泽',   name: '玄机',   category: '计谋', element: '水', target: 'self',
       fillHand: true, desc: '将手牌抽满至 9 张（多出的回归卡包）',
       talent: { name: '神兽之智', desc: '起手 7 张', type: 'drawBonus', value: 2 },
-      hp: 10, skins: [{ id: 'default', name: '原版' }] }
+      hp: 10, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- v3.10 新卡（3 名新英雄，进卡池/招募所） ---------- */
+    { id: 'wz4', nick: '开山斧', name: '雷震',   category: '战斗', element: '水', target: 'single',
+      damage: 17, desc: '对目标造成 17 点伤害，30% 暴击伤害 ×1.5',
+      skill: { name: '开山一击', chance: 0.3, critDmg: 1.5 },
+      talent: { name: '威震', desc: '战斗牌伤害 +10%', type: 'battlePct', value: 10 },
+      hp: 5, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'qb4', nick: '铁壁',   name: '庞磐',   category: '护卫', element: '木', target: 'self',
+      defGain: 11, heal: 1, desc: '获得 11 点防御，恢复 1 点血量',
+      talent: { name: '磐石', desc: '受击伤害 -10%', type: 'dmgReduce', value: 10 },
+      hp: 13, skins: [{ id: 'default', name: '原版' }] },
+    { id: 'ms3', nick: '点星笔', name: '文若',   category: '计谋', element: '木', target: 'self',
+      draw: 3, desc: '抽 3 张牌',
+      talent: { name: '神笔', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
+      hp: 9, skins: [{ id: 'default', name: '原版' }] }
   ];
 
   /** 只读视图展开 */

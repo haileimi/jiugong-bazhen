@@ -158,8 +158,8 @@
       check('英雄 ' + h.id + ' 主将血量>0', h.hp > 0);
       catSet[h.category] = true;
     });
-    check('英雄共 13 名', H.HEROES.length === 13);
-    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 13);
+    check('英雄共 16 名', H.HEROES.length === 16);
+    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 16);
     check('三类齐全：战斗', catSet['战斗'] === true);
     check('三类齐全：护卫', catSet['护卫'] === true);
     check('三类齐全：计谋', catSet['计谋'] === true);
@@ -239,14 +239,18 @@
 
     /* ============ 11. 卡包构建（8 项） ============ */
     var pack = GS.buildPack('wz1');
-    check('卡包 48 张（上限）', pack.length === 48);
+    check('卡包 60 张（16 英雄 × 4）', pack.length === 60);
     check('主将不出现在卡包', pack.every(function (c) { return c.heroId !== 'wz1'; }));
-    check('卡包含 12 种偏将', new Set(pack.map(function (c) { return c.heroId; })).size === 12);
+    check('卡包含 15 种偏将', new Set(pack.map(function (c) { return c.heroId; })).size === 15);
     check('每种 4 张', pack.filter(function (c) { return c.heroId === 'gs1'; }).length === 4);
-    check('uid 唯一', new Set(pack.map(function (c) { return c.uid; })).size === 48);
+    check('uid 唯一', new Set(pack.map(function (c) { return c.uid; })).size === 60);
     check('卡包含新增白泽', pack.some(function (c) { return c.heroId === 'bz1'; }));
-    check('白泽当主将时卡包满 48', GS.buildPack('bz1').length === 48);
+    check('白泽当主将时卡包满 60', GS.buildPack('bz1').length === 60);
     check('白泽主将时不含白泽', GS.buildPack('bz1').every(function (c) { return c.heroId !== 'bz1'; }));
+    check('新卡在册：开山斧/铁壁/点星笔', !!H.byId('wz4') && !!H.byId('qb4') && !!H.byId('ms3'));
+    check('新卡 3 名偏将入卡包', ['wz4', 'qb4', 'ms3'].every(function (id) {
+      return pack.some(function (c) { return c.heroId === id; });
+    }));
 
     /* ============ 12. 战斗开始（9 项） ============ */
     var b1 = setupMonsterBattle([0.5]);
@@ -282,7 +286,7 @@
     check('天机 3→2', b2.st.tianji === 2);
     check('手牌移除该卡', !GS.cardInHand(b2.st, 'wz1#0'));
     check('标记已使用', b2.st.usedThisTurn['wz1#0'] === true);
-    check('卡包仍 48 张（用完回卡包）', b2.st.pack.length === 48);
+    check('卡包仍 60 张（用完回卡包）', b2.st.pack.length === 60);
 
     /* ============ 14. 出牌：全体战斗（3 项） ============ */
     var b3 = setupPlay([0.99, 0.99, 0.99, 0.99]);
@@ -404,7 +408,7 @@
     b15.pack = GS.buildPack('dw1');
     b15.layer = 2;
     var s = SS.serialize(b15);
-    check('存档含层数/主将/卡包', s.layer === 2 && s.commander.heroId === 'dw1' && s.pack.length === 48);
+    check('存档含层数/主将/卡包', s.layer === 2 && s.commander.heroId === 'dw1' && s.pack.length === 60);
     check('存档不含战斗状态', s.hand === undefined && s.turn === undefined);
     check('存档版本 v3', s.v === 3);
     check('今日日期格式 YYYY-MM-DD', /^\d{4}-\d{2}-\d{2}$/.test(SS.today()));
@@ -438,14 +442,14 @@
     var rw1 = EC.victoryRewards(e1.st);
     check('小怪战 +15 马蹄金', rw1.gold === EC.MONSTER_GOLD && e1.st.gold === EC.MONSTER_GOLD);
     check('小怪战军粮 +1（3→4）', rw1.rationGained === 1 && e1.st.rations === 4);
-    check('小怪战掷骰命中掉 1 卡（卡包 49）', rw1.cards.length === 1 && e1.st.pack.length === 49);
+    check('小怪战掷骰命中掉 1 卡（卡包 61）', rw1.cards.length === 1 && e1.st.pack.length === 61);
     check('奖励已标记防重复', e1.st.rewardApplied === true);
 
     // 小怪战掷骰不中不掉卡（rnd 0.5 ≥ 0.35）
     var e2 = setupEconomy([0.5]);
     e2.st.gold = 0;
     var rw2 = EC.victoryRewards(e2.st);
-    check('小怪战掷骰不中不掉卡（卡包仍 48）', rw2.cards.length === 0 && e2.st.pack.length === 48);
+    check('小怪战掷骰不中不掉卡（卡包仍 60）', rw2.cards.length === 0 && e2.st.pack.length === 60);
 
     // 魔王战：+40 金、军粮封顶、保底掉卡
     var e3 = setupEconomy([0.0]);
@@ -454,7 +458,7 @@
     var rw3 = EC.victoryRewards(e3.st);
     check('魔王战 +40 马蹄金', rw3.gold === EC.BOSS_GOLD && e3.st.gold === EC.BOSS_GOLD);
     check('魔王战军粮封顶（满 5 不加）', rw3.rationGained === 0 && e3.st.rations === 5);
-    check('魔王战保底掉卡（卡包 49）', rw3.cards.length === 1 && e3.st.pack.length === 49);
+    check('魔王战保底掉卡（卡包 61）', rw3.cards.length === 1 && e3.st.pack.length === 61);
 
     // 卡包成长 uid 唯一
     check('成长卡 uid 唯一（连续加 2 张）', (function () {
@@ -463,17 +467,17 @@
       s.pack = GS.buildPack('dw1');
       EC.addCardToPack(s, 'wz1');
       EC.addCardToPack(s, 'wz1');
-      return s.pack.length === 50 && new Set(s.pack.map(function (c) { return c.uid; })).size === 50;
+      return s.pack.length === 62 && new Set(s.pack.map(function (c) { return c.uid; })).size === 62;
     })());
 
     // 商店：买招式卡包
     var e4 = setupEconomy([0.5]);
     e4.st.gold = 100;
     var buy1 = EC.buyPackCard(e4.st);
-    check('商店买卡成功：-30 金、卡包 +1', buy1.ok && e4.st.gold === 70 && e4.st.pack.length === 49);
+    check('商店买卡成功：-30 金、卡包 +1', buy1.ok && e4.st.gold === 70 && e4.st.pack.length === 61);
     e4.st.gold = 10;
     var buy2 = EC.buyPackCard(e4.st);
-    check('金币不足买卡失败', !buy2.ok && e4.st.gold === 10 && e4.st.pack.length === 49);
+    check('金币不足买卡失败', !buy2.ok && e4.st.gold === 10 && e4.st.pack.length === 61);
 
     // 商店：军粮补给
     var e5 = setupEconomy([0.5]);
@@ -487,7 +491,7 @@
     var e6 = setupEconomy([0.5]);
     e6.st.gold = 100;
     var rec1 = EC.recruitHero(e6.st, 'gs1');
-    check('招募偏将成功：-20 金、卡包 +1', rec1.ok && e6.st.gold === 80 && e6.st.pack.length === 49);
+    check('招募偏将成功：-20 金、卡包 +1', rec1.ok && e6.st.gold === 80 && e6.st.pack.length === 61);
     check('不可招募主将自己', !EC.recruitHero(e6.st, 'dw1').ok);
 
     // 军粮消耗（进战斗门槛）
@@ -501,6 +505,39 @@
       s.rations = 3;
       return EC.canEnterBattle(s) && EC.enterBattle(s) && s.rations === 2;
     })());
+
+    /* ============ 26. 法宝系统（10 项） ============ */
+    check('法宝 3 件在册', EC.FABAOS.length === 3);
+
+    // 购买/装备
+    var f1 = setupEconomy([0.5]).st;
+    f1.gold = 200;
+    var bf1 = EC.buyFabao(f1, 'huxinjing');
+    check('购买法宝扣 60 金并装备', bf1.ok && f1.gold === 140 && EC.fabaoOf(f1).id === 'huxinjing');
+    var bf2 = EC.buyFabao(f1, 'chixiaojian');
+    check('再购替换旧法宝', bf2.ok && EC.fabaoOf(f1).id === 'chixiaojian' && f1.gold === 80);
+    f1.gold = 10;
+    check('金币不足买法宝失败', !EC.buyFabao(f1, 'hetuluoshu').ok && EC.fabaoOf(f1).id === 'chixiaojian');
+
+    // 玄铁护心镜：主将受击 -15%（穆奎另有 20% 减伤天赋：100 → 80 → 68）
+    var f2 = setupPlay([0.5]);
+    f2.st.commander = { heroId: 'dw1', hp: 100, maxHp: 100, defense: 0, fabao: 'huxinjing' };
+    BS.damageCommander(f2.st, f2.ev, 100, null);
+    check('护心镜受击伤害 -15%（100→68）', f2.st.commander.hp === 100 - 68);
+
+    // 赤霄剑：战斗牌伤害 +15%
+    var f3 = setupPlay([0.99, 0.99]);
+    f3.st.commander.fabao = 'chixiaojian';
+    f3.st.hand = ['wz1#0'];
+    var rf3 = BS.playCard(f3.st, f3.ev, 'wz1#0', f3.st.enemies[0].id);
+    check('赤霄剑战斗牌伤害 +15%', !!rf3 && rf3.damage === Math.max(2, Math.round(16 * E.counterMult('火', f3.st.enemies[0].element) * 1.15)));
+
+    // 河图洛书：每回合多抽 1 张
+    var f4 = GS.createState({ random: seqRng([0.5]) });
+    f4.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0, fabao: 'hetuluoshu' };
+    f4.pack = GS.buildPack('dw1');
+    g.DSH_TurnSystem.startBattle(f4, new g.DSH_EventSystem(), 'monster');
+    check('河图洛书起手 6 张', f4.hand.length === 6);
 
     /* ============ 汇总 ============ */
     details = assert.slice();

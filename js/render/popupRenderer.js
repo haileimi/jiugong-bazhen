@@ -25,7 +25,7 @@
     return { overlay: overlay, box: box };
   }
 
-  /** 开局选主将（13 名英雄任选其一） */
+  /** 开局选主将（16 名英雄任选其一） */
   function showCommanderPick(onPick) {
     clear();
     var o = overlay('pick-modal');
@@ -141,6 +141,28 @@
         });
       }
       box.appendChild(rationBtn);
+
+      // 法宝（装备主将，替换旧法宝）
+      var fabaoTitle = document.createElement('div');
+      fabaoTitle.className = 'shop-section';
+      fabaoTitle.textContent = '🧿 法宝（装备主将，战斗中生效）';
+      box.appendChild(fabaoTitle);
+      g.DSH_Economy.FABAOS.forEach(function (f) {
+        var equipped = g.DSH_Economy.fabaoOf(state) && g.DSH_Economy.fabaoOf(state).id === f.id;
+        var btn2 = document.createElement('button');
+        btn2.className = 'price-btn' +
+          (g.DSH_Economy.hasRun(state) && state.gold >= f.price ? '' : ' disabled');
+        btn2.innerHTML = '<span>' + f.icon + ' ' + f.name + '</span>' +
+          '<span class="price">' + (equipped ? '已装备' : f.price + ' 金') + '</span>' +
+          '<span class="price-sub">' + f.desc + '</span>';
+        if (g.DSH_Economy.hasRun(state)) {
+          btn2.addEventListener('click', function () {
+            render(g.DSH_Economy.buyFabao(state, f.id).msg);
+          });
+        }
+        box.appendChild(btn2);
+      });
+
       if (msg) {
         var line = document.createElement('p');
         line.className = 'shop-result';

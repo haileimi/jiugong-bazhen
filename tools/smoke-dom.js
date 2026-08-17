@@ -140,11 +140,11 @@ if (!pageMap || pageMap.style.display === 'none') {
 }
 const app = sandbox.DSH_APP;
 const st = app.getState();
-if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 48) {
+if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 60) {
   console.error('✗ 主将/卡包初始化错误');
   process.exit(1);
 }
-console.log('✓ 主将选定穆奎，卡包 48 张，进入第 ' + st.layer + ' 层地图');
+console.log('✓ 主将选定穆奎，卡包 60 张，进入第 ' + st.layer + ' 层地图');
 
 // 4. 点击「小怪战斗点」进入战斗
 const monsterNode = created.find((e) => String(e.className).indexOf('map-node') >= 0 &&

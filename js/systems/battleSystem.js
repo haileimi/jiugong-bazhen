@@ -98,6 +98,8 @@
     if (talent && talent.type === 'battlePct') payload.mult *= (100 + talent.value) / 100;
     if (hero.target === 'all' && talent && talent.type === 'aoePct') payload.mult *= (100 + talent.value) / 100;
     if ((state.runBuffs.battlePct || 0) > 0) payload.mult *= (100 + state.runBuffs.battlePct) / 100;
+    // 法宝：赤霄剑 —— 战斗牌伤害 +15%
+    if (state.commander.fabao === 'chixiaojian') payload.mult *= 1.15;
     if (!state.firstCardPlayedThisTurn) {
       if (talent && talent.type === 'firstCardBonus') payload.bonus += talent.value;
       state.firstCardPlayedThisTurn = true;
@@ -248,6 +250,8 @@
     var talent = GS().commanderDef(state).talent;
     if (talent && talent.type === 'dmgReduce') dmg = Math.round(dmg * (100 - talent.value) / 100);
     dmg = Math.round(dmg * (100 - (state.runBuffs.defPct || 0)) / 100);
+    // 法宝：玄铁护心镜 —— 主将受击伤害 -15%
+    if (state.commander.fabao === 'huxinjing') dmg = Math.round(dmg * 85 / 100);
 
     var absorbed = 0;
     if (state.commander.defense > 0) {

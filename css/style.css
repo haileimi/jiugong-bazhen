@@ -1544,6 +1544,15 @@ body {
 }
 .price-btn.disabled { opacity: 0.55; cursor: not-allowed; }
 
+.shop-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--gold-soft);
+  letter-spacing: 1px;
+}
+
 /* ---- 招募所英雄列表 ---- */
 .recruit-grid {
   display: grid;

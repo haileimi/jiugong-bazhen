@@ -25,6 +25,14 @@
   var PACK_CARD_PRICE = 30;       // 商店：随机偏将招式卡
   var RATION_PRICE = 15;          // 商店：军粮 +1
   var RECRUIT_PRICE = 20;         // 招募所：指定偏将 1 张
+  var FABAO_PRICE = 60;           // 商店：法宝（装备主将，替换旧法宝）
+
+  /* ---------------- 法宝（商店购买，装备主将，战斗生效） ---------------- */
+  var FABAOS = [
+    { id: 'huxinjing',  name: '玄铁护心镜', icon: '🛡️', desc: '主将受击伤害 -15%',  price: FABAO_PRICE },
+    { id: 'chixiaojian', name: '赤霄剑',    icon: '⚔️', desc: '战斗牌伤害 +15%',    price: FABAO_PRICE },
+    { id: 'hetuluoshu', name: '河图洛书',  icon: '📖', desc: '每回合多抽 1 张牌',  price: FABAO_PRICE }
+  ];
 
   /** 是否已有进行中的一局（商店/招募的卡牌加入当前局卡包） */
   function hasRun(state) {
@@ -118,6 +126,25 @@
     return { ok: true, msg: '招募成功：『' + h.nick + ' · ' + h.name + '』招式卡 ×1', card: heroId };
   }
 
+  /** 当前装备的法宝（无则 null） */
+  function fabaoOf(state) {
+    if (!state.commander || !state.commander.fabao) return null;
+    for (var i = 0; i < FABAOS.length; i++) if (FABAOS[i].id === state.commander.fabao) return FABAOS[i];
+    return null;
+  }
+
+  /** 商店：购买法宝（装备主将，替换旧法宝） */
+  function buyFabao(state, fabaoId) {
+    if (!hasRun(state)) return { ok: false, msg: '还没有进行中的战斗，请先「开始战斗」' };
+    var f = null;
+    for (var i = 0; i < FABAOS.length; i++) if (FABAOS[i].id === fabaoId) { f = FABAOS[i]; break; }
+    if (!f) return { ok: false, msg: '未知法宝' };
+    if (state.gold < f.price) return { ok: false, msg: '马蹄金不足（需要 ' + f.price + '）' };
+    state.gold -= f.price;
+    state.commander.fabao = f.id;
+    return { ok: true, msg: '装备『' + f.name + '』：' + f.desc, fabao: f };
+  }
+
   g.DSH_Economy = {
     RATIONS_MAX: RATIONS_MAX,
     BATTLE_RATION_COST: BATTLE_RATION_COST,
@@ -129,6 +156,8 @@
     PACK_CARD_PRICE: PACK_CARD_PRICE,
     RATION_PRICE: RATION_PRICE,
     RECRUIT_PRICE: RECRUIT_PRICE,
+    FABAO_PRICE: FABAO_PRICE,
+    FABAOS: FABAOS,
     hasRun: hasRun,
     canEnterBattle: canEnterBattle,
     enterBattle: enterBattle,
@@ -137,6 +166,8 @@
     victoryRewards: victoryRewards,
     buyPackCard: buyPackCard,
     buyRation: buyRation,
-    recruitHero: recruitHero
+    recruitHero: recruitHero,
+    fabaoOf: fabaoOf,
+    buyFabao: buyFabao
   };
 })(typeof window !== 'undefined' ? window : globalThis);

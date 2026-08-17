@@ -8,7 +8,7 @@
  *
  * 主将：被打的就是他（防御先扣再扣血），主将死 = 输；恢复类一律恢复血量。
  * 防御：每场战斗开始归零。
- * 卡包：主将之外的 12 名英雄各 4 张 = 48 张；手牌上限 9（9宫格副将区限制）。
+ * 卡包：主将之外的 15 名英雄各 4 张 = 60 张；手牌上限 9（9宫格副将区限制）。
  */
 (function (g) {
   'use strict';
@@ -20,7 +20,7 @@
   var DEFENSE_RESET = true; // 每场战斗防御归零
   var COMMANDER_HP_MULT = 4; // 主将血量倍率（原英雄血量×4，可调）
 
-  /** 卡包构成：主将外的 12 名英雄 × 4 = 48 张（uid 唯一） */
+  /** 卡包构成：主将外的 15 名英雄 × 4 = 60 张（uid 唯一） */
   function buildPack(commanderId) {
     var pack = [];
     g.DSH_HEROES.packHeroIds(commanderId).forEach(function (heroId) {

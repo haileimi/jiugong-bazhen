@@ -214,7 +214,7 @@
     g.DSH_PopupRenderer.showCommanderPick(function (heroId) {
       var def = g.DSH_HEROES.byId(heroId);
       var hp = def.hp * g.DSH_GameState.COMMANDER_HP_MULT;
-      state.commander = { heroId: heroId, hp: hp, maxHp: hp, defense: 0 };
+      state.commander = { heroId: heroId, hp: hp, maxHp: hp, defense: 0, fabao: null };
       state.pack = g.DSH_GameState.buildPack(heroId);
       g.DSH_GameState.pushLog(state, '🏮 主将选定：' + def.nick + '（' + def.name + '）· 天赋『' + def.talent.name + '』');
       showMap();

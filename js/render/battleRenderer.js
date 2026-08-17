@@ -272,7 +272,8 @@
     info.appendChild(defRow);
 
     var foot = el('div', 'ci-foot');
-    foot.appendChild(el('span', '', '🧿 法宝：空'));
+    var fabao = g.DSH_Economy.fabaoOf(state);
+    foot.appendChild(el('span', '', '🧿 法宝：' + (fabao ? fabao.icon + fabao.name : '空')));
     foot.appendChild(el('span', '', '🃏 卡包 ' + state.pack.length + ' 张'));
     var stars = '';
     for (var i = 0; i < state.maxTianji; i++) stars += i < state.tianji ? '✦' : '☆';

@@ -22,11 +22,13 @@
     return picked;
   }
 
-  /** 起手/补手：抽到 5 张（+ 观星眼/白泽天赋多抽） */
+  /** 起手/补手：抽到 5 张（+ 观星眼/白泽天赋多抽 + 河图洛书法宝） */
   function drawHand(state) {
     var bonus = 0;
     var talent = GS().commanderDef(state) && GS().commanderDef(state).talent;
     if (talent && talent.type === 'drawBonus') bonus = talent.value;
+    // 法宝：河图洛书 —— 每回合多抽 1 张
+    if (state.commander && state.commander.fabao === 'hetuluoshu') bonus += 1;
     var want = GS().BASE_DRAW + bonus - state.hand.length;
     if (want > 0) {
       var cards = drawFromPack(state, want);
