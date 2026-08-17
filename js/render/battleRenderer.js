@@ -63,35 +63,60 @@
 
   /* ---------------- 战场：5×3 小鬼区 / 一格界河 / 5×3 副将区（手牌） ---------------- */
 
-  /** 小鬼区：5×3 敌方（魔王战：5 魔将第 1 行 + 本体居中；小怪战：2 只第 1 行） */
+  /** 敌方部门（与我军镜像：上谋略部 / 中远程部 / 下近战部，同部门隔界河相对） */
+  var ENEMY_DEPTS = [
+    { cat: '计谋', name: '谋略部', symbol: '🪶' },
+    { cat: '护卫', name: '远程部', symbol: '🏹' },
+    { cat: '战斗', name: '近战部', symbol: '⚔️' }
+  ];
+
+  /** 小鬼区：5×3 敌方（按定位归镜像部门，排内居中；魔王本体居近战部中央） */
   function renderEnemyRow(state) {
-    var grid = document.getElementById('enemy-row');
-    if (!grid) return;
-    grid.innerHTML = '';
+    var zone = document.getElementById('enemy-row');
+    if (!zone) return;
+    zone.innerHTML = '';
 
-    var slots = [];
-    if (state.battleKind === 'boss') {
-      slots.push({ idx: 7, e: state.boss, boss: true });           // 第 2 行居中
-      state.enemies.forEach(function (e, i) { slots.push({ idx: i, e: e, boss: false }); }); // 第 1 行 5 只
-    } else {
-      state.enemies.forEach(function (e, i) { slots.push({ idx: i === 0 ? 1 : 3, e: e, boss: false }); });
-    }
-
-    for (var c = 0; c < 15; c++) {
-      var cell = el('div', 'grid-cell');
-      var slot = null;
-      for (var i = 0; i < slots.length; i++) if (slots[i].idx === c) { slot = slots[i]; break; }
-      if (slot) {
-        var card = createEnemyCard(slot.e, state, slot.boss);
-        if (slot.boss) card.classList.add('boss-card');
-        if (g.DSH_GameState.enemyAlive(state, slot.e.id)) card.classList.add('targetable');
-        cell.appendChild(card);
-      } else {
-        cell.classList.add('empty');
-        cell.appendChild(el('div', 'cell-dot', '·'));
+    ENEMY_DEPTS.forEach(function (dept) {
+      var units = [];
+      if (state.battleKind === 'boss' && state.boss && (state.boss.category || '战斗') === dept.cat) {
+        units.push({ e: state.boss, boss: true });
       }
-      grid.appendChild(cell);
-    }
+      state.enemies.forEach(function (e) {
+        if ((e.category || '战斗') === dept.cat) units.push({ e: e, boss: false });
+      });
+      // 魔王本体居中（近战部内）
+      if (dept.cat === '战斗' && units.length > 1) {
+        for (var k = 0; k < units.length; k++) {
+          if (units[k].boss) {
+            var u = units.splice(k, 1)[0];
+            units.splice(Math.floor(units.length / 2), 0, u);
+            break;
+          }
+        }
+      }
+
+      var row = el('div', 'dept-row dept-' + dept.cat);
+      row.appendChild(el('span', 'dept-symbol', dept.symbol));
+      row.appendChild(el('span', 'dept-label', dept.name));
+
+      var start = Math.max(0, Math.floor((5 - units.length) / 2));
+      for (var c = 0; c < 5; c++) {
+        var cell = el('div', 'grid-cell');
+        var idx = c - start;
+        if (idx >= 0 && idx < units.length) {
+          var u = units[idx];
+          var card = createEnemyCard(u.e, state, u.boss);
+          if (u.boss) card.classList.add('boss-card');
+          if (g.DSH_GameState.enemyAlive(state, u.e.id)) card.classList.add('targetable');
+          cell.appendChild(card);
+        } else {
+          cell.classList.add('empty');
+          cell.appendChild(el('div', 'cell-dot', '·'));
+        }
+        row.appendChild(cell);
+      }
+      zone.appendChild(row);
+    });
   }
 
   function renderEnemyTargets(state) {

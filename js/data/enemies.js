@@ -1,22 +1,23 @@
 /**
  * enemies.js — 五魔将 + 魔王本体（第 8 将）
- * 字段：血/攻。魔将按牌序循环出牌（跳过阵亡）；魔将全灭后魔王本体解锁进攻。
+ * 字段：血/攻/定位（category：战斗/护卫/计谋，用于部门区摆放）。
+ * 魔将按牌序循环出牌（跳过阵亡）；魔将全灭后魔王本体解锁进攻。
  * 魔焰将（e3）为全体攻击。
- * 布局：魔王本体最上独占一行，魔将上 2 下 3 排列。
+ * 布局：小鬼区部门与我军镜像（上谋略部 / 中远程部 / 下近战部，同部门隔界河相对）。
  */
 (function (g) {
   'use strict';
 
   var GENERALS = [
-    { id: 'e1', name: '蚀骨爪魔', element: '土', hp: 18, atk: 5, aoe: false },
-    { id: 'e2', name: '浊流魔',   element: '水', hp: 16, atk: 4, aoe: false },
-    { id: 'e3', name: '魔焰将',   element: '火', hp: 22, atk: 4, aoe: true },
-    { id: 'e4', name: '赤炎魔',   element: '火', hp: 20, atk: 6, aoe: false },
-    { id: 'e5', name: '狂煞魔',   element: '金', hp: 16, atk: 4, aoe: false }
+    { id: 'e1', name: '蚀骨爪魔', element: '土', hp: 18, atk: 5, aoe: false, category: '战斗' },
+    { id: 'e2', name: '浊流魔',   element: '水', hp: 16, atk: 4, aoe: false, category: '计谋' },
+    { id: 'e3', name: '魔焰将',   element: '火', hp: 22, atk: 4, aoe: true,  category: '护卫' },
+    { id: 'e4', name: '赤炎魔',   element: '火', hp: 20, atk: 6, aoe: false, category: '战斗' },
+    { id: 'e5', name: '狂煞魔',   element: '金', hp: 16, atk: 4, aoe: false, category: '计谋' }
   ];
 
   /** 魔王本体（第 8 将）：魔将全灭前被守护，不可被攻击 */
-  var BOSS = { id: 'boss', name: '混沌·六爻魔', element: '土', hp: 100, atk: 6, aoe: false };
+  var BOSS = { id: 'boss', name: '混沌·六爻魔', element: '土', hp: 100, atk: 6, aoe: false, category: '战斗' };
 
   g.DSH_ENEMIES = {
     GENERALS: GENERALS,

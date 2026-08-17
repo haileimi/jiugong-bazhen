@@ -55,7 +55,8 @@
       return {
         id: e.id, name: e.name, element: e.element,
         hp: Math.round(e.hp * hpMul), maxHp: Math.round(e.hp * hpMul),
-        atk: Math.round(e.atk * atkMul), aoe: e.aoe, alive: true
+        atk: Math.round(e.atk * atkMul), aoe: e.aoe, alive: true,
+        category: e.category || '战斗'
       };
     }
     var picked;
@@ -66,7 +67,8 @@
         id: b.id, name: b.name, element: b.element,
         hp: Math.round(b.hp * (1 + 0.25 * (layer - 1))),
         maxHp: Math.round(b.hp * (1 + 0.25 * (layer - 1))),
-        atk: Math.round(b.atk * (1 + 0.12 * (layer - 1))), aoe: false, alive: true
+        atk: Math.round(b.atk * (1 + 0.12 * (layer - 1))), aoe: false, alive: true,
+        category: b.category || '战斗'
       };
     } else {
       var pool = GS().shuffle(state, gen.slice());
