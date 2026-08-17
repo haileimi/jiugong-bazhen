@@ -69,6 +69,16 @@
     return { st: st, ev: ev };
   }
 
+  /** 经济系统测试用：手搭状态（不消耗随机序列，rnd 供结算掷骰） */
+  function setupEconomy(seq) {
+    var GS = g.DSH_GameState;
+    var st = GS.createState({ random: seqRng(seq || [0.5]) });
+    st.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+    st.pack = GS.buildPack('dw1');
+    st.battleKind = 'monster';
+    return { st: st };
+  }
+
   function run() {
     ok = 0; fail = 0; details = [];
     var E = g.DSH_ELEMENTS;
@@ -80,6 +90,7 @@
     var BS = g.DSH_BattleSystem;
     var TS = g.DSH_TurnSystem;
     var SS = g.DSH_SaveSystem;
+    var EC = g.DSH_Economy;
 
     /* ============ 1. 五行克制（25 项） ============ */
     var expect = {
@@ -415,6 +426,79 @@
       g.DSH_TurnSystem.startBattle(a, new g.DSH_EventSystem(), 'monster');
       var base = EN.byId(a.enemies[0].id);
       return a.enemies[0].atk === Math.round(base.atk * 1.15);
+    })());
+
+    /* ============ 25. 经济系统：奖励结算 / 商店 / 招募 / 军粮（16 项） ============ */
+    check('军粮每日上限 5 点', EC.RATIONS_MAX === 5);
+
+    // 小怪战胜利：+15 金、+1 军粮、掷骰掉卡（rnd 0.1 < 0.35 掉）
+    var e1 = setupEconomy([0.1, 0.3]);
+    e1.st.gold = 0; e1.st.rations = 3;
+    var rw1 = EC.victoryRewards(e1.st);
+    check('小怪战 +15 马蹄金', rw1.gold === EC.MONSTER_GOLD && e1.st.gold === EC.MONSTER_GOLD);
+    check('小怪战军粮 +1（3→4）', rw1.rationGained === 1 && e1.st.rations === 4);
+    check('小怪战掷骰命中掉 1 卡（卡包 49）', rw1.cards.length === 1 && e1.st.pack.length === 49);
+    check('奖励已标记防重复', e1.st.rewardApplied === true);
+
+    // 小怪战掷骰不中不掉卡（rnd 0.5 ≥ 0.35）
+    var e2 = setupEconomy([0.5]);
+    e2.st.gold = 0;
+    var rw2 = EC.victoryRewards(e2.st);
+    check('小怪战掷骰不中不掉卡（卡包仍 48）', rw2.cards.length === 0 && e2.st.pack.length === 48);
+
+    // 魔王战：+40 金、军粮封顶、保底掉卡
+    var e3 = setupEconomy([0.0]);
+    e3.st.battleKind = 'boss';
+    e3.st.gold = 0; e3.st.rations = 5;
+    var rw3 = EC.victoryRewards(e3.st);
+    check('魔王战 +40 马蹄金', rw3.gold === EC.BOSS_GOLD && e3.st.gold === EC.BOSS_GOLD);
+    check('魔王战军粮封顶（满 5 不加）', rw3.rationGained === 0 && e3.st.rations === 5);
+    check('魔王战保底掉卡（卡包 49）', rw3.cards.length === 1 && e3.st.pack.length === 49);
+
+    // 卡包成长 uid 唯一
+    check('成长卡 uid 唯一（连续加 2 张）', (function () {
+      var s = GS.createState({ random: seqRng([0.5]) });
+      s.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+      s.pack = GS.buildPack('dw1');
+      EC.addCardToPack(s, 'wz1');
+      EC.addCardToPack(s, 'wz1');
+      return s.pack.length === 50 && new Set(s.pack.map(function (c) { return c.uid; })).size === 50;
+    })());
+
+    // 商店：买招式卡包
+    var e4 = setupEconomy([0.5]);
+    e4.st.gold = 100;
+    var buy1 = EC.buyPackCard(e4.st);
+    check('商店买卡成功：-30 金、卡包 +1', buy1.ok && e4.st.gold === 70 && e4.st.pack.length === 49);
+    e4.st.gold = 10;
+    var buy2 = EC.buyPackCard(e4.st);
+    check('金币不足买卡失败', !buy2.ok && e4.st.gold === 10 && e4.st.pack.length === 49);
+
+    // 商店：军粮补给
+    var e5 = setupEconomy([0.5]);
+    e5.st.gold = 100; e5.st.rations = 5;
+    check('军粮满时不可补给', !EC.buyRation(e5.st).ok);
+    e5.st.rations = 4;
+    var buyR = EC.buyRation(e5.st);
+    check('军粮补给 +1、-15 金（4→5）', buyR.ok && e5.st.rations === 5 && e5.st.gold === 85);
+
+    // 招募所
+    var e6 = setupEconomy([0.5]);
+    e6.st.gold = 100;
+    var rec1 = EC.recruitHero(e6.st, 'gs1');
+    check('招募偏将成功：-20 金、卡包 +1', rec1.ok && e6.st.gold === 80 && e6.st.pack.length === 49);
+    check('不可招募主将自己', !EC.recruitHero(e6.st, 'dw1').ok);
+
+    // 军粮消耗（进战斗门槛）
+    check('军粮 0 时不可进战斗', (function () {
+      var s = setupEconomy([0.5]).st;
+      s.rations = 0;
+      return !EC.canEnterBattle(s);
+    })());
+    check('进战斗消耗 1 军粮', (function () {
+      var s = setupEconomy([0.5]).st;
+      s.rations = 3;
+      return EC.canEnterBattle(s) && EC.enterBattle(s) && s.rations === 2;
     })());
 
     /* ============ 汇总 ============ */

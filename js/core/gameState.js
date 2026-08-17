@@ -110,7 +110,9 @@
       lastHits: [],
       log: [],
       rnd: rnd,
-      over: null                // 'win' | 'lose'
+      over: null,               // 'win' | 'lose'
+      rewardApplied: false,     // 胜利结算是否已执行（防重复）
+      lastReward: null          // 最近一次胜利结算摘要 { gold, rationGained, cards }
     };
   }
 

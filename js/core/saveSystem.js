@@ -10,6 +10,7 @@
 
   var SAVE_KEY = 'jgbz_save_v3';
   var RATIONS_KEY = 'jgbz_rations_v3';
+  var META_KEY = 'jgbz_meta_v3'; // 跨局持久：马蹄金 / 历史最高层（战败不清）
 
   function today() {
     return new Date().toISOString().slice(0, 10);
@@ -33,6 +34,8 @@
   function save(state) {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(state)));
+      // 同步跨局 meta（马蹄金/最高层），保证战败清档后金币不丢
+      setMeta({ gold: state.gold, bestLayer: state.bestLayer || 0 });
       // 军粮日期同步（保证每日 5 点）
       localStorage.setItem(RATIONS_KEY, JSON.stringify({ date: today(), value: state.rations }));
       return true;
@@ -79,6 +82,27 @@
     } catch (e) { /* 忽略 */ }
   }
 
+  /** 跨局 meta（马蹄金 / 历史最高层）—— 战败清档后仍保留 */
+  function getMeta() {
+    try {
+      var raw = localStorage.getItem(META_KEY);
+      if (raw) {
+        var m = JSON.parse(raw);
+        if (m && typeof m === 'object') return m;
+      }
+    } catch (e) { /* 忽略 */ }
+    return {};
+  }
+
+  function setMeta(obj) {
+    try {
+      var m = getMeta();
+      if (obj && obj.gold !== undefined) m.gold = obj.gold;
+      if (obj && obj.bestLayer !== undefined) m.bestLayer = obj.bestLayer;
+      localStorage.setItem(META_KEY, JSON.stringify(m));
+    } catch (e) { /* 忽略 */ }
+  }
+
   g.DSH_SaveSystem = {
     serialize: serialize,
     save: save,
@@ -87,6 +111,8 @@
     clear: clear,
     rationsToday: rationsToday,
     setRations: setRations,
+    getMeta: getMeta,
+    setMeta: setMeta,
     today: today
   };
 })(typeof window !== 'undefined' ? window : globalThis);

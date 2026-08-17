@@ -51,8 +51,8 @@
     o.box.appendChild(grid);
   }
 
-  /** 战斗胜利奖励页（先做样子，数值/内容后续） */
-  function showReward(state, onEnd) {
+  /** 战斗胜利奖励页（数值化：真实结算的金币/军粮/英雄卡） */
+  function showReward(state, reward, onEnd) {
     clear();
     var o = overlay('reward-modal');
     o.box.innerHTML = '<h2>🏆 战斗胜利</h2>' +
@@ -61,25 +61,160 @@
     var row = document.createElement('div');
     row.className = 'reward-row';
     var items = [
-      { icon: '🃏', name: '英雄卡包', hint: '可获新英雄招式' },
-      { icon: '💰', name: '马蹄金', hint: '用于购物' },
-      { icon: '🍚', name: '军粮', hint: '体力，每日 5 点' },
-      { icon: '🧿', name: '法宝', hint: '装备道具' }
+      { icon: '💰', name: '马蹄金', value: '+ ' + ((reward && reward.gold) || 0), hint: '商店 / 招募所消费' },
+      { icon: '🍚', name: '军粮', value: (reward && reward.rationGained > 0) ? '+ ' + reward.rationGained : '已满',
+        hint: '每日 ' + g.DSH_Economy.RATIONS_MAX + ' 点' },
+      { icon: '🃏', name: '英雄卡', value: (reward && reward.cards.length) ? '× ' + reward.cards.length : '无',
+        hint: '卡包成长' }
     ];
     items.forEach(function (it) {
       var cell = document.createElement('div');
       cell.className = 'reward-cell';
       cell.innerHTML = '<div class="reward-icon">' + it.icon + '</div>' +
         '<div class="reward-name">' + it.name + '</div>' +
+        '<div class="reward-value">' + it.value + '</div>' +
         '<div class="reward-hint">' + it.hint + '</div>';
       row.appendChild(cell);
     });
     o.box.appendChild(row);
+    // 掉卡详情
+    if (reward && reward.cards.length) {
+      var names = reward.cards.map(function (hid) {
+        var h = g.DSH_HEROES.byId(hid);
+        return '『' + h.nick + ' · ' + h.name + '』';
+      }).join('、');
+      var drop = document.createElement('p');
+      drop.className = 'reward-drop';
+      drop.textContent = '🎁 获得新招式卡：' + names;
+      o.box.appendChild(drop);
+    }
     var btn = document.createElement('button');
     btn.className = 'primary-btn';
     btn.textContent = '结束';
     btn.addEventListener('click', function () { clear(); onEnd(); });
     o.box.appendChild(btn);
+  }
+
+  /** 商店：招式卡包 / 军粮补给（onClose 关闭时回调，用于刷新首页数值） */
+  function showShop(state, onClose) {
+    clear();
+    var o = overlay('shop-modal');
+    var box = o.box;
+    function render(msg) {
+      box.innerHTML = '';
+      var title = document.createElement('h2');
+      title.textContent = '🏪 商店';
+      box.appendChild(title);
+      var bal = document.createElement('div');
+      bal.className = 'shop-balance';
+      bal.innerHTML = '<span>💰 马蹄金 <b>' + state.gold + '</b></span>' +
+        '<span>🍚 军粮 <b>' + state.rations + '/' + g.DSH_Economy.RATIONS_MAX + '</b></span>';
+      box.appendChild(bal);
+      var sub = document.createElement('p');
+      sub.className = 'modal-sub';
+      if (!g.DSH_Economy.hasRun(state)) {
+        sub.textContent = '⚠ 还没有进行中的战斗，请先「开始战斗」。购买的卡牌将加入当前局的卡包。';
+      } else {
+        sub.textContent = '卡牌直接加入当前局卡包（可超 48 张成长）';
+      }
+      box.appendChild(sub);
+      // 招式卡包
+      var packBtn = document.createElement('button');
+      packBtn.className = 'price-btn' + (g.DSH_Economy.hasRun(state) && state.gold >= g.DSH_Economy.PACK_CARD_PRICE ? '' : ' disabled');
+      packBtn.innerHTML = '<span>🃏 招式卡包</span><span class="price">' + g.DSH_Economy.PACK_CARD_PRICE + ' 金</span>' +
+        '<span class="price-sub">随机 1 名偏将的招式卡</span>';
+      if (g.DSH_Economy.hasRun(state)) {
+        packBtn.addEventListener('click', function () {
+          render(g.DSH_Economy.buyPackCard(state).msg);
+        });
+      }
+      box.appendChild(packBtn);
+      // 军粮补给
+      var rationBtn = document.createElement('button');
+      rationBtn.className = 'price-btn' +
+        (g.DSH_Economy.hasRun(state) && state.gold >= g.DSH_Economy.RATION_PRICE && state.rations < g.DSH_Economy.RATIONS_MAX ? '' : ' disabled');
+      rationBtn.innerHTML = '<span>🍚 军粮补给</span><span class="price">' + g.DSH_Economy.RATION_PRICE + ' 金</span>' +
+        '<span class="price-sub">军粮 +1（每日 ' + g.DSH_Economy.RATIONS_MAX + ' 点封顶）</span>';
+      if (g.DSH_Economy.hasRun(state) && state.rations < g.DSH_Economy.RATIONS_MAX) {
+        rationBtn.addEventListener('click', function () {
+          render(g.DSH_Economy.buyRation(state).msg);
+        });
+      }
+      box.appendChild(rationBtn);
+      if (msg) {
+        var line = document.createElement('p');
+        line.className = 'shop-result';
+        line.textContent = msg;
+        box.appendChild(line);
+      }
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'primary-btn';
+      closeBtn.textContent = '关闭';
+      closeBtn.addEventListener('click', function () { clear(); if (onClose) onClose(); });
+      box.appendChild(closeBtn);
+    }
+    render(null);
+  }
+
+  /** 招募所：花金招募指定偏将招式卡（onClose 关闭时回调） */
+  function showRecruit(state, onClose) {
+    clear();
+    var o = overlay('recruit-modal');
+    var box = o.box;
+    function render(msg) {
+      box.innerHTML = '';
+      var title = document.createElement('h2');
+      title.textContent = '🏮 招募所';
+      box.appendChild(title);
+      var sub = document.createElement('p');
+      sub.className = 'modal-sub';
+      if (!g.DSH_Economy.hasRun(state)) {
+        sub.textContent = '⚠ 还没有进行中的战斗，请先「开始战斗」。招募的招式卡将加入当前局卡包。';
+      } else {
+        sub.textContent = '花 ' + g.DSH_Economy.RECRUIT_PRICE + ' 金招募指定偏将招式卡 ×1（卡包可超 48 成长）';
+      }
+      box.appendChild(sub);
+      var bal = document.createElement('div');
+      bal.className = 'shop-balance';
+      bal.innerHTML = '<span>💰 马蹄金 <b>' + state.gold + '</b></span>' +
+        '<span>🃏 卡包 <b>' + state.pack.length + '</b> 张</span>';
+      box.appendChild(bal);
+      if (msg) {
+        var line = document.createElement('p');
+        line.className = 'shop-result';
+        line.textContent = msg;
+        box.appendChild(line);
+      }
+      var grid = document.createElement('div');
+      grid.className = 'recruit-grid';
+      g.DSH_HEROES.HEROES.forEach(function (h) {
+        var isCommander = state.commander && h.id === state.commander.heroId;
+        var affordable = g.DSH_Economy.hasRun(state) && !isCommander && state.gold >= g.DSH_Economy.RECRUIT_PRICE;
+        var cell = document.createElement('button');
+        cell.className = 'recruit-card recruit-cat-' + h.category +
+          (isCommander ? ' commander' : '') + (affordable ? '' : ' unaffordable');
+        cell.innerHTML =
+          '<div class="recruit-icon">' + (g.DSH_CardRenderer.CAT_ICON[h.category] || '🏮') + '</div>' +
+          '<div class="recruit-info">' +
+          '<div class="recruit-name">' + h.nick + ' <span class="pack-sub">' + h.name + ' · ' + h.element + '</span></div>' +
+          '<div class="recruit-desc">' + h.desc + '</div>' +
+          '<div class="recruit-price">' + (isCommander ? '主将 · 不可招募' : g.DSH_Economy.RECRUIT_PRICE + ' 金 / 1 张') + '</div>' +
+          '</div>';
+        if (!isCommander && g.DSH_Economy.hasRun(state)) {
+          cell.addEventListener('click', function () {
+            render(g.DSH_Economy.recruitHero(state, h.id).msg);
+          });
+        }
+        grid.appendChild(cell);
+      });
+      box.appendChild(grid);
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'primary-btn';
+      closeBtn.textContent = '关闭';
+      closeBtn.addEventListener('click', function () { clear(); if (onClose) onClose(); });
+      box.appendChild(closeBtn);
+    }
+    render(null);
   }
 
   /** 败局弹窗 */
@@ -248,6 +383,8 @@
     showEvent: showEvent,
     showStats: showStats,
     showPack: showPack,
+    showShop: showShop,
+    showRecruit: showRecruit,
     showConfirm: showConfirm,
     showMessage: showMessage,
     clear: clear

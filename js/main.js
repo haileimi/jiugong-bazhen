@@ -29,11 +29,19 @@
   }
 
   /* ---------------- 战斗流程 ---------------- */
+  /** 跨局 meta 同步（马蹄金/历史最高层：战败清档后不丢） */
+  function syncMeta() {
+    g.DSH_SaveSystem.setMeta({ gold: state.gold, bestLayer: state.bestLayer || 0 });
+  }
+
   function handleBattleEnd() {
     if (state.over === 'win') {
       if (state.layer > state.bestLayer) state.bestLayer = state.layer;
-      g.DSH_PopupRenderer.showReward(state, onRewardEnd);
+      if (!state.rewardApplied) state.lastReward = g.DSH_Economy.victoryRewards(state);
+      syncMeta();
+      g.DSH_PopupRenderer.showReward(state, state.lastReward, onRewardEnd);
     } else if (state.over === 'lose') {
+      syncMeta();
       g.DSH_PopupRenderer.showResult(state, onLoseHome);
     }
   }
@@ -54,6 +62,7 @@
   }
 
   function onLoseHome() {
+    syncMeta();
     g.DSH_SaveSystem.clear();
     showHome();
   }
@@ -102,7 +111,17 @@
   }
 
   function nodeAct(type) {
-    if (type === 'monster') startBattle('monster');
+    if (type === 'monster' || type === 'boss') {
+      // 军粮（体力）门槛：每日 5 点，进战斗消耗 1，胜利返还
+      if (!g.DSH_Economy.canEnterBattle(state)) {
+        g.DSH_PopupRenderer.showMessage('🍚 军粮不足',
+          '进入战斗需要 ' + g.DSH_Economy.BATTLE_RATION_COST + ' 军粮（每日 ' + g.DSH_Economy.RATIONS_MAX +
+          ' 点）。可在首页「商店」补给，或明日再来。');
+        return;
+      }
+      g.DSH_Economy.enterBattle(state);
+      startBattle(type);
+    }
     else if (type === 'camp') g.DSH_PopupRenderer.showCamp(state, function () {
       var n = firstUndoneNode();
       if (n) n.done = true;
@@ -113,7 +132,6 @@
       if (n) n.done = true;
       showMap();
     });
-    else if (type === 'boss') startBattle('boss');
   }
 
   function renderMap() {
@@ -159,12 +177,17 @@
   }
 
   /* ---------------- 首页 ---------------- */
-  function renderHome() {
-    state.rations = g.DSH_SaveSystem.rationsToday();
+  /** 只刷新首页数值（商店/招募关闭后调用，避免 renderHome 用旧存档覆盖军粮） */
+  function refreshHomeStats() {
     var goldEl = document.getElementById('home-gold');
     if (goldEl) goldEl.textContent = state.gold;
     var rationsEl = document.getElementById('home-rations');
     if (rationsEl) rationsEl.textContent = state.rations + '/5';
+  }
+
+  function renderHome() {
+    state.rations = g.DSH_SaveSystem.rationsToday();
+    refreshHomeStats();
     var startBtn = document.getElementById('home-start-btn');
     if (startBtn) {
       var has = g.DSH_SaveSystem.hasSave();
@@ -199,14 +222,15 @@
   function loadRun() {
     var d = g.DSH_SaveSystem.load();
     if (!d) { showHome(); return; }
+    var meta = g.DSH_SaveSystem.getMeta();
     state.layer = d.layer;
     state.mapNodes = d.mapNodes;
     state.commander = d.commander;
     state.pack = d.pack;
     state.runBuffs = d.runBuffs || { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
-    state.gold = d.gold || 0;
-    state.rations = d.rations || g.DSH_SaveSystem.rationsToday();
-    state.bestLayer = d.bestLayer || 0;
+    state.gold = (meta.gold !== undefined) ? meta.gold : (d.gold || 0);
+    state.rations = g.DSH_SaveSystem.rationsToday(); // 军粮为每日资源，以当日同步值为准
+    state.bestLayer = meta.bestLayer || d.bestLayer || 0;
     showMap();
   }
 
@@ -226,7 +250,8 @@
       if (btn && !btn.dataset.bound) {
         btn.dataset.bound = '1';
         btn.addEventListener('click', function () {
-          g.DSH_PopupRenderer.showMessage('🚧 开发中', '商店/招募所正在建设中，敬请期待');
+          if (id === 'home-shop-btn') g.DSH_PopupRenderer.showShop(state, refreshHomeStats);
+          else g.DSH_PopupRenderer.showRecruit(state, refreshHomeStats);
         });
       }
     });
@@ -296,6 +321,10 @@
   function init() {
     events = new g.DSH_EventSystem();
     state = g.DSH_GameState.createState();
+    // 跨局 meta：马蹄金 / 历史最高层（战败清档后仍保留）
+    var meta = g.DSH_SaveSystem.getMeta();
+    if (meta.gold !== undefined) state.gold = meta.gold;
+    if (meta.bestLayer) state.bestLayer = meta.bestLayer;
     g.DSH_CardRenderer.resetHpBars();
 
     pageEls = {

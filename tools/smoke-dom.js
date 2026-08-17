@@ -23,6 +23,7 @@ const files = [
   'js/systems/hexSystem.js',
   'js/systems/ruleSystem.js',
   'js/systems/battleSystem.js',
+  'js/systems/economySystem.js',
   'js/render/cardRenderer.js',
   'js/render/battleRenderer.js',
   'js/render/popupRenderer.js',
@@ -184,7 +185,69 @@ if (st.over === 'lose') {
   console.log('✓ 回合流转完成：进入第 ' + st.turn + ' 回合，天机回满 ' + st.tianji + '/' + st.maxTianji);
 }
 
-// 7. 战斗自检仍然可跑
+// 6.5 经济：进入战斗消耗 1 军粮（每日 5 → 4）
+if (st.rations !== 4) {
+  console.error('✗ 军粮未按预期消耗（rations=' + st.rations + '，应为 4）');
+  process.exit(1);
+}
+console.log('✓ 进入战斗消耗 1 军粮（剩 ' + st.rations + '/5）');
+
+// 7. 地图「返回」→ 保存并回首页
+const mapBackBtn = elements['map-back-btn'];
+if (!mapBackBtn) { console.error('✗ 未找到地图返回按钮'); process.exit(1); }
+mapBackBtn.click();
+const savedOk = created.filter((e) => e.textContent === '确定').pop();
+if (!savedOk) { console.error('✗ 未找到保存消息弹窗按钮'); process.exit(1); }
+savedOk.click();
+if (!pageHome || pageHome.style.display === 'none') {
+  console.error('✗ 保存后未返回首页');
+  process.exit(1);
+}
+console.log('✓ 保存并返回首页（金币 ' + st.gold + ' · 军粮 ' + st.rations + '/5）');
+
+// 8. 商店弹窗：打开 → 金币不足买卡被拒 → 关闭
+const shopBtn = elements['home-shop-btn'];
+if (!shopBtn) { console.error('✗ 未找到商店按钮'); process.exit(1); }
+shopBtn.click();
+const modalRootEl = elements['modal-root'];
+if (modalRootEl.children.length === 0) {
+  console.error('✗ 商店未弹出');
+  process.exit(1);
+}
+const packBuyBtn = created.filter((e) => String(e.className || '').indexOf('price-btn') >= 0 &&
+  String(e.innerHTML || '').indexOf('招式卡包') >= 0).pop();
+if (!packBuyBtn) { console.error('✗ 商店未渲染商品按钮'); process.exit(1); }
+packBuyBtn.click(); // 金币 0，应提示不足
+if (!created.some((e) => String(e.className || '').indexOf('shop-result') >= 0 &&
+  String(e.textContent || '').indexOf('马蹄金不足') >= 0)) {
+  console.error('✗ 金币不足买卡未被拒绝');
+  process.exit(1);
+}
+console.log('✓ 商店弹窗正常，金币不足买卡被拒');
+const shopClose = created.filter((e) => e.textContent === '关闭').pop();
+if (!shopClose) { console.error('✗ 商店无关闭按钮'); process.exit(1); }
+shopClose.click();
+
+// 9. 招募所弹窗：打开 → 主将不可招募 → 关闭
+const recruitBtn = elements['home-recruit-btn'];
+if (!recruitBtn) { console.error('✗ 未找到招募所按钮'); process.exit(1); }
+recruitBtn.click();
+const recruitCard = created.filter((e) => String(e.className || '').indexOf('recruit-card') >= 0).pop();
+if (!recruitCard) {
+  console.error('✗ 招募所未渲染英雄列表');
+  process.exit(1);
+}
+if (!created.some((e) => String(e.className || '').indexOf('recruit-card') >= 0 &&
+  String(e.innerHTML || '').indexOf('主将 · 不可招募') >= 0)) {
+  console.error('✗ 主将未被标记为不可招募');
+  process.exit(1);
+}
+console.log('✓ 招募所弹窗正常，主将不可招募');
+const recruitClose = created.filter((e) => e.textContent === '关闭').pop();
+if (!recruitClose) { console.error('✗ 招募所无关闭按钮'); process.exit(1); }
+recruitClose.click();
+
+// 10. 战斗自检仍然可跑
 const res = sandbox.DSH_Selftest.run();
 if (!res.pass) { console.error('✗ 自检失败: ' + res.fail + ' 项'); process.exit(1); }
-console.log('✓ 冒烟测试全部通过（加载 → 首页 → 选将 → 地图 → 战斗 → 回合流转 无异常，自检 ' + res.total + ' 项）');
+console.log('✓ 冒烟测试全部通过（加载 → 首页 → 选将 → 地图 → 战斗 → 回合流转 → 军粮 → 商店/招募 无异常，自检 ' + res.total + ' 项）');

@@ -100,6 +100,8 @@
     };
     state.lastHits = [];
     state.over = null;
+    state.rewardApplied = false;
+    state.lastReward = null;
 
     buildEnemies(state);
 
