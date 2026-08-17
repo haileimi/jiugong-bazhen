@@ -186,8 +186,9 @@
   }
 
   function renderHome() {
-    state.rations = g.DSH_SaveSystem.rationsToday(); // 按本地日重新结算：跨天自动回 5
-    g.DSH_SaveSystem.setRations(state.rations);      // 写回存储，刷新后即时生效
+    // 军粮每次刷新/回首页即回满（避免 0 军粮卡死无法进游戏）
+    state.rations = g.DSH_Economy.RATIONS_MAX;
+    g.DSH_SaveSystem.setRations(state.rations);
     refreshHomeStats();
     var startBtn = document.getElementById('home-start-btn');
     if (startBtn) {
