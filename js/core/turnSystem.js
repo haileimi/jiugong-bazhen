@@ -47,9 +47,15 @@
     return m;
   }
 
-  /** 建敌方阵容：小怪战 2 只随机魔将；魔王战 5 魔将 + 本体；按层数成长 */
+  /**
+   * 建敌方阵容：
+   *   tutorial —— 流寇 2 只（新手教学，弱、不成长）
+   *   boss     —— 本层路线阵营的 5 将 + 善恶选择的 boss（善=山河盟主 / 恶=曜魔宗主）
+   *   monster  —— 本层路线阵营随机 2 只
+   * 路线：state.route 'good' = 打官军（山河盟）；否则打魔军（曜魔宗）。
+   */
   function buildEnemies(state) {
-    var gen = g.DSH_ENEMIES.GENERALS;
+    var EN = g.DSH_ENEMIES;
     var layer = state.layer;
     var hpMul = 1 + 0.3 * (layer - 1);
     var atkMul = 1 + 0.15 * (layer - 1);
@@ -61,10 +67,24 @@
         category: e.category || '战斗'
       };
     }
-    var picked;
+    function scaleFixed(e) { // 教学流寇：不随层数成长
+      return {
+        id: e.id, name: e.name, element: e.element,
+        hp: e.hp, maxHp: e.hp, atk: e.atk, aoe: e.aoe, alive: true,
+        category: e.category || '战斗'
+      };
+    }
+
+    if (state.battleKind === 'tutorial') {
+      state.enemies = EN.BANDITS.map(scaleFixed);
+      state.boss = null;
+      return;
+    }
+
+    var army = EN.armyOf(state.route); // 'good' → 官军；否则魔军
     if (state.battleKind === 'boss') {
-      picked = gen.map(scale);
-      var b = g.DSH_ENEMIES.BOSS;
+      state.enemies = army.map(scale);
+      var b = EN.bossOf(state.bossChoice); // 'good' → 善boss；否则恶boss
       state.boss = {
         id: b.id, name: b.name, element: b.element,
         hp: Math.round(b.hp * (1 + 0.25 * (layer - 1))),
@@ -73,16 +93,16 @@
         category: b.category || '战斗'
       };
     } else {
-      var pool = GS().shuffle(state, gen.slice());
-      picked = pool.slice(0, 2).map(scale);
+      var pool = GS().shuffle(state, army.slice());
+      state.enemies = pool.slice(0, 2).map(scale);
       state.boss = null;
     }
-    state.enemies = picked;
   }
 
-  /** 开始一场战斗（小怪战/魔王战） */
+  /** 开始一场战斗（小怪战/魔王战/教学） */
   function startBattle(state, events, kind) {
-    GS().pushLog(state, '—— 第 ' + state.layer + ' 层 ' + (kind === 'boss' ? '魔王战' : '小怪战') + ' 开始 ——');
+    GS().pushLog(state, '—— 第 ' + state.layer + ' 层 ' +
+      (kind === 'boss' ? '魔王战' : (kind === 'tutorial' ? '流寇战（新手教学）' : '小怪战')) + ' 开始 ——');
     state.battleKind = kind;
     state.turn = 1;
     state.phase = 'player';

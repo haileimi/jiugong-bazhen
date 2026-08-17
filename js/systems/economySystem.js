@@ -145,6 +145,47 @@
     return { ok: true, msg: '装备『' + f.name + '』：' + f.desc, fabao: f };
   }
 
+  /* ---------------- 善恶值与周期结算（v3.10 世界观） ---------------- */
+
+  /** 善恶名号：+10 义士 / -10 恶徒 / 0 中立 */
+  function alignmentTitle(a) {
+    a = a || 0;
+    if (a > 0) return '义士 · 正义';
+    if (a < 0) return '恶徒 · 邪恶';
+    return '中立佣兵';
+  }
+
+  /**
+   * 周期结算（每层 boss 战后、runBuffs 重置后调用）：按善恶值给不同奖励/惩罚。
+   * 金币 + 下一层层 buff（在传入的 runBuffs 上叠加）。
+   * 调用前需先由 main.js 根据 boss 选择设置 state.alignment（±10）。
+   * @returns {{title:string, text:string}}
+   */
+  function settleAlignment(state) {
+    var a = state.alignment || 0;
+    if (a < 0) {
+      state.gold += 60; // 掠夺民财，佣金更狠
+      state.runBuffs.enemyAtkPct = (state.runBuffs.enemyAtkPct || 0) + 5; // 通缉：敌方攻击 +5%
+      return {
+        title: '☠ 恶名昭彰',
+        text: '你杀了山河盟主，天下悬赏通缉你。掠夺所得 +60 金，但官军会愈发凶狠（下一层敌方攻击 +5%）。'
+      };
+    }
+    if (a > 0) {
+      state.gold += 40; // 民心支持
+      state.runBuffs.battlePct = (state.runBuffs.battlePct || 0) + 5; // 民心：战斗牌伤害 +5%
+      return {
+        title: '🕊 义名远扬',
+        text: '你除掉了曜魔宗主，百姓称颂。民心赠礼 +40 金，士气高涨（下一层战斗牌伤害 +5%）。'
+      };
+    }
+    state.gold += 30;
+    return {
+      title: '⚔ 佣兵本色',
+      text: '你不偏向任何一方，只认钱办事。佣金 +30 金。'
+    };
+  }
+
   g.DSH_Economy = {
     RATIONS_MAX: RATIONS_MAX,
     BATTLE_RATION_COST: BATTLE_RATION_COST,
@@ -168,6 +209,8 @@
     buyRation: buyRation,
     recruitHero: recruitHero,
     fabaoOf: fabaoOf,
-    buyFabao: buyFabao
+    buyFabao: buyFabao,
+    alignmentTitle: alignmentTitle,
+    settleAlignment: settleAlignment
   };
 })(typeof window !== 'undefined' ? window : globalThis);

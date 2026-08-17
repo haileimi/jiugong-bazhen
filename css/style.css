@@ -1598,3 +1598,60 @@ body {
 .recruit-price { font-size: 11px; color: var(--gold-soft); }
 .recruit-card.commander { opacity: 0.6; cursor: not-allowed; }
 .recruit-card.unaffordable .recruit-price { color: var(--red); }
+
+/* ---- 路线选择弹窗（v3.10 世界观） ---- */
+.route-modal .modal { max-width: 420px; }
+.route-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+.route-btn:hover:not(.blocked) { border-color: var(--gold); }
+.route-btn.forced { border-color: var(--gold); box-shadow: 0 0 10px rgba(212, 175, 55, 0.4); }
+.route-btn.blocked { opacity: 0.5; cursor: not-allowed; }
+.route-icon { font-size: 22px; flex: 0 0 auto; }
+.route-info { display: flex; flex-direction: column; gap: 2px; }
+.route-name { font-weight: bold; color: var(--gold-soft); }
+.route-sub { font-size: 10px; color: var(--text-dim); }
+.route-reason { font-size: 10px; color: var(--red); margin-left: auto; max-width: 130px; text-align: right; }
+.route-note { margin-top: 10px; font-size: 11px; color: var(--red); text-align: center; }
+
+/* ---- Boss 选择弹窗（善恶目标） ---- */
+.boss-modal .modal { max-width: 420px; }
+.boss-choice {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+.boss-choice.good { border-left: 3px solid #7ddfa0; }
+.boss-choice.evil { border-left: 3px solid #e74c3c; }
+.boss-choice:hover { border-color: var(--gold); }
+.bc-icon { font-size: 26px; flex: 0 0 auto; }
+.bc-info { display: flex; flex-direction: column; gap: 2px; }
+.bc-name { font-weight: bold; color: var(--gold-soft); font-size: 14px; }
+.bc-tag { font-size: 10px; color: var(--text-dim); }
+.bc-stat { font-size: 11px; color: var(--text); }
+
+/* ---- 首页善恶值 ---- */
+#home-align { font-size: 13px; }

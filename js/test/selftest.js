@@ -539,6 +539,53 @@
     g.DSH_TurnSystem.startBattle(f4, new g.DSH_EventSystem(), 'monster');
     check('河图洛书起手 6 张', f4.hand.length === 6);
 
+    /* ============ 27. 善恶世界观：阵营/路线/教学/boss选择/结算（14 项） ============ */
+    check('官军 5 将 + 善boss + 恶boss + 流寇 2 只', EN.GUANJUN.length === 5 && !!EN.BOSS_GOOD &&
+      !!EN.BOSS && EN.BANDITS.length === 2);
+    check('路线取军队：good→官军 / 默认→魔军', EN.armyOf('good') === EN.GUANJUN && EN.armyOf(null) === EN.GENERALS);
+    check('善恶取 boss：good→山河盟主 / 默认→曜魔宗主', EN.bossOf('good').id === 'boss-good' && EN.bossOf(null).id === 'boss');
+
+    // 教学战：流寇 2 只、不成长、无 boss
+    var w1 = GS.createState({ random: seqRng([0.5]) });
+    w1.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0, fabao: null };
+    w1.pack = GS.buildPack('dw1');
+    g.DSH_TurnSystem.startBattle(w1, new g.DSH_EventSystem(), 'tutorial');
+    check('教学战：流寇 2 只无 boss', w1.battleKind === 'tutorial' && w1.enemies.length === 2 && w1.boss === null &&
+      w1.enemies.every(function (e) { return e.id === 'l1' || e.id === 'l2'; }));
+
+    // 路线决定敌方阵营
+    var w2 = GS.createState({ random: seqRng([0.5]) });
+    w2.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0, fabao: null };
+    w2.pack = GS.buildPack('dw1');
+    w2.route = 'good';
+    g.DSH_TurnSystem.startBattle(w2, new g.DSH_EventSystem(), 'monster');
+    check('邪恶路线：敌方是官军（g 开头）', w2.enemies.every(function (e) { return e.id.indexOf('g') === 0; }));
+
+    // boss 选择决定 boss 本体
+    var w3 = GS.createState({ random: seqRng([0.5]) });
+    w3.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0, fabao: null };
+    w3.pack = GS.buildPack('dw1');
+    w3.route = 'evil';
+    w3.bossChoice = 'good';
+    g.DSH_TurnSystem.startBattle(w3, new g.DSH_EventSystem(), 'boss');
+    check('选善boss：本体是山河盟主', w3.boss.id === 'boss-good' && w3.enemies.length === 5);
+
+    // 周期结算奖惩
+    var w4 = setupEconomy([0.5]).st;
+    w4.gold = 0; w4.alignment = -10;
+    var st1 = EC.settleAlignment(w4);
+    check('恶结算：+60 金 + 通缉惩罚', w4.gold === 60 && w4.runBuffs.enemyAtkPct === 5);
+    var w5 = setupEconomy([0.5]).st;
+    w5.gold = 0; w5.alignment = 10;
+    var st2 = EC.settleAlignment(w5);
+    check('善结算：+40 金 + 民心奖励', w5.gold === 40 && w5.runBuffs.battlePct === 5);
+    var w6 = setupEconomy([0.5]).st;
+    w6.gold = 0; w6.alignment = 0;
+    var st3 = EC.settleAlignment(w6);
+    check('中立结算：+30 金', w6.gold === 30);
+    check('善恶名号映射', EC.alignmentTitle(-10) === '恶徒 · 邪恶' && EC.alignmentTitle(10) === '义士 · 正义' &&
+      EC.alignmentTitle(0) === '中立佣兵');
+
     /* ============ 汇总 ============ */
     details = assert.slice();
     assert = [];

@@ -72,18 +72,21 @@
       gold: (opts.meta && opts.meta.gold !== undefined) ? opts.meta.gold : 0,
       rations: (opts.meta && opts.meta.rations !== undefined) ? opts.meta.rations : todayRations(),
       bestLayer: (opts.meta && opts.meta.bestLayer) || 0,
+      alignment: (opts.meta && opts.meta.alignment !== undefined) ? opts.meta.alignment : 0, // 善恶 -10(恶)~+10(善)
 
       /* ---- run ---- */
       layer: 1,
-      commander: null,          // { heroId, hp, maxHp, defense }
+      commander: null,          // { heroId, hp, maxHp, defense, fabao }
       pack: [],                 // [{ uid, heroId }]
       hand: [],                 // [uid]
       mapNodes: buildMapNodes(),
       runBuffs: { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 },
+      route: null,              // 本层讨伐阵营：'good'(官军/山河盟) | 'evil'(曜魔宗军) | null(未选)
       saved: false,
 
       /* ---- battle ---- */
-      battleKind: null,         // 'monster' | 'boss'
+      battleKind: null,         // 'tutorial' | 'monster' | 'boss'
+      bossChoice: null,         // boss 战选择：'good'(善boss=山河盟主) | 'evil'(恶boss=曜魔宗主)
       tianji: BASE_TIANJI,
       maxTianji: BASE_TIANJI,
       tianjiUpApplied: false,   // 观星眼能力：本场战斗天机上限 +1（每场最多一次）

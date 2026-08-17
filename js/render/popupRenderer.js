@@ -397,6 +397,70 @@
     o.box.appendChild(btn);
   }
 
+  /** 路线选择：本层讨伐哪一方军队（正义路线=讨伐曜魔宗 / 邪恶路线=劫掠山河盟） */
+  function showRouteChoice(state, onPick, opts) {
+    clear();
+    opts = opts || {};
+    var o = overlay('route-modal');
+    o.box.innerHTML = '<h2>🛤 选择路线</h2>' +
+      '<p class="modal-sub">你是这个世界的雇佣兵。选择本层讨伐的对象——这决定你面对哪方军队。</p>' +
+      '<p class="modal-sub">⚖ 善恶：' + (state.alignment > 0 ? '+' : '') + (state.alignment || 0) +
+      '（' + g.DSH_Economy.alignmentTitle(state.alignment) + '）</p>';
+
+    var forced = opts.forced || null; // { route, reason }
+    var rows = [
+      { route: 'evil', icon: '⚔', name: '正义路线', sub: '讨伐曜魔宗（魔军）', tip: '受雇为民除害，对抗曜魔宗' },
+      { route: 'good', icon: '☠', name: '邪恶路线', sub: '劫掠山河盟（官军）', tip: '受雇打家劫舍，劫掠山河盟' }
+    ];
+    rows.forEach(function (r) {
+      var isForced = forced && forced.route === r.route;
+      var blocked = forced && forced.route !== r.route;
+      var btn = document.createElement('button');
+      btn.className = 'route-btn' + (isForced ? ' forced' : '') + (blocked ? ' blocked' : '');
+      btn.innerHTML = '<span class="route-icon">' + r.icon + '</span>' +
+        '<span class="route-info"><span class="route-name">' + r.name + '</span>' +
+        '<span class="route-sub">' + r.sub + '</span></span>' +
+        (blocked ? '<span class="route-reason">' + forced.reason + '</span>' : '');
+      if (!blocked) {
+        btn.addEventListener('click', function () { clear(); onPick(r.route); });
+      }
+      o.box.appendChild(btn);
+    });
+    if (forced) {
+      var note = document.createElement('p');
+      note.className = 'route-note';
+      note.textContent = '⚠ ' + forced.reason;
+      o.box.appendChild(note);
+    }
+  }
+
+  /** Boss 选择：层末打善 boss（山河盟主）还是恶 boss（曜魔宗主）——决定善恶值 */
+  function showBossChoice(state, onPick) {
+    clear();
+    var o = overlay('boss-modal');
+    o.box.innerHTML = '<h2>👑 选择讨伐目标</h2>' +
+      '<p class="modal-sub">本层的最终一战。击杀目标决定你的善恶立场：' +
+      '<b>杀善者 = 恶（-10）</b>，<b>杀恶者 = 善（+10）</b>。</p>';
+
+    var layer = state.layer;
+    var bosses = [
+      { choice: 'good', icon: '🕊', name: '山河盟主·镇岳王', tag: '善 · 正义领袖', element: '土', hp: 110, atk: 7 },
+      { choice: 'evil', icon: '💀', name: '曜魔宗主·六爻魔', tag: '恶 · 魔道宗主', element: '土', hp: 100, atk: 6 }
+    ];
+    bosses.forEach(function (b) {
+      var hp = Math.round(b.hp * (1 + 0.25 * (layer - 1)));
+      var atk = Math.round(b.atk * (1 + 0.12 * (layer - 1)));
+      var btn = document.createElement('button');
+      btn.className = 'boss-choice ' + (b.choice === 'good' ? 'good' : 'evil');
+      btn.innerHTML = '<div class="bc-icon">' + b.icon + '</div>' +
+        '<div class="bc-info"><div class="bc-name">' + b.name + '</div>' +
+        '<div class="bc-tag">' + b.tag + '</div>' +
+        '<div class="bc-stat">血 ' + hp + ' · 攻 ' + atk + ' · ' + b.element + '</div></div>';
+      btn.addEventListener('click', function () { clear(); onPick(b.choice); });
+      o.box.appendChild(btn);
+    });
+  }
+
   g.DSH_PopupRenderer = {
     showCommanderPick: showCommanderPick,
     showReward: showReward,
@@ -407,6 +471,8 @@
     showPack: showPack,
     showShop: showShop,
     showRecruit: showRecruit,
+    showRouteChoice: showRouteChoice,
+    showBossChoice: showBossChoice,
     showConfirm: showConfirm,
     showMessage: showMessage,
     clear: clear

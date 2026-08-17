@@ -29,14 +29,28 @@
   }
 
   /* ---------------- 战斗流程 ---------------- */
-  /** 跨局 meta 同步（马蹄金/历史最高层：战败清档后不丢） */
+  /** 跨局 meta 同步（马蹄金/历史最高层/善恶值：战败清档后不丢） */
   function syncMeta() {
-    g.DSH_SaveSystem.setMeta({ gold: state.gold, bestLayer: state.bestLayer || 0 });
+    g.DSH_SaveSystem.setMeta({
+      gold: state.gold,
+      bestLayer: state.bestLayer || 0,
+      alignment: state.alignment || 0
+    });
   }
 
   function handleBattleEnd() {
     if (state.over === 'win') {
       if (state.layer > state.bestLayer) state.bestLayer = state.layer;
+      if (state.battleKind === 'tutorial') {
+        // 新手教学（流寇）：给一点启动金，然后进入路线选择
+        state.gold += 10;
+        state.rewardApplied = true;
+        g.DSH_SaveSystem.setMeta({ tutored: true });
+        g.DSH_PopupRenderer.showMessage('🏠 村子得救',
+          '你与村民阿大、阿二、阿三联手击退了流寇，村子保住了（+10 金）。\n佣兵之路正式开始——选择你的立场吧。',
+          showRouteChoice);
+        return;
+      }
       if (!state.rewardApplied) state.lastReward = g.DSH_Economy.victoryRewards(state);
       syncMeta();
       g.DSH_PopupRenderer.showReward(state, state.lastReward, onRewardEnd);
@@ -46,16 +60,37 @@
     }
   }
 
-  /** 奖励页「结束」：节点推进；魔王战胜利 → 下一层 */
+  /** 路线选择入口：善恶 ±10 时被通缉/被复仇，路线锁定（用户设定：打善boss → 下层层要打官军） */
+  function showRouteChoice() {
+    var forced = null;
+    if (state.alignment < 0) {
+      forced = { route: 'good', reason: '你杀了山河盟主，官军正通缉你——只能走对抗山河盟的路线' };
+    } else if (state.alignment > 0) {
+      forced = { route: 'evil', reason: '你杀了曜魔宗主，魔宗正悬赏你——只能走讨伐曜魔宗的路线' };
+    }
+    g.DSH_PopupRenderer.showRouteChoice(state, function (route) {
+      state.route = route;
+      g.DSH_GameState.pushLog(state, '🛤 本层路线：' + (route === 'good' ? '劫掠山河盟（对抗官军）' : '讨伐曜魔宗（对抗魔军）'));
+      showMap();
+    }, { forced: forced });
+  }
+
+  /** 奖励页「结束」：节点推进；魔王战胜利 → 善恶结算 + 开启下一层 */
   function onRewardEnd() {
     var node = firstUndoneNode();
     if (node) node.done = true;
 
     if (state.battleKind === 'boss') {
+      // 善恶值：打善boss（杀善者=恶 -10）/ 打恶boss（杀恶者=善 +10）
+      state.alignment = state.bossChoice === 'good' ? -10 : 10;
       state.layer += 1;
       state.mapNodes = g.DSH_GameState.buildMapNodes();
       state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
-      g.DSH_PopupRenderer.showMessage('🗺 新地图开启', '魔王已伏诛，前方是第 ' + state.layer + ' 层！', showMap);
+      var settle = g.DSH_Economy.settleAlignment(state); // 周期结算：金币 + 下一层层 buff
+      state.bossChoice = null;
+      syncMeta();
+      g.DSH_PopupRenderer.showMessage('🗺 第 ' + state.layer + ' 层 · ' + settle.title,
+        settle.text, showRouteChoice);
       return;
     }
     showMap();
@@ -112,11 +147,20 @@
 
   function nodeAct(type) {
     if (type === 'monster' || type === 'boss') {
-      // 军粮（体力）门槛：每日 5 点，进战斗消耗 1，胜利返还
+      // 军粮（体力）门槛：进战斗消耗 1，胜利返还
       if (!g.DSH_Economy.canEnterBattle(state)) {
         g.DSH_PopupRenderer.showMessage('🍚 军粮不足',
           '进入战斗需要 ' + g.DSH_Economy.BATTLE_RATION_COST + ' 军粮（每日 ' + g.DSH_Economy.RATIONS_MAX +
           ' 点）。可在首页「商店」补给，或明日再来。');
+        return;
+      }
+      if (type === 'boss') {
+        // 层末 boss 可选：善 boss（山河盟主）/ 恶 boss（曜魔宗主）—— 决定善恶值
+        g.DSH_PopupRenderer.showBossChoice(state, function (choice) {
+          state.bossChoice = choice;
+          g.DSH_Economy.enterBattle(state);
+          startBattle('boss');
+        });
         return;
       }
       g.DSH_Economy.enterBattle(state);
@@ -136,7 +180,10 @@
 
   function renderMap() {
     var layerEl = document.getElementById('map-layer');
-    if (layerEl) layerEl.textContent = '第 ' + state.layer + ' 层';
+    if (layerEl) {
+      var foe = state.route === 'good' ? ' · 对抗山河盟（官军）' : (state.route === 'evil' ? ' · 讨伐曜魔宗（魔军）' : '');
+      layerEl.textContent = '第 ' + state.layer + ' 层' + foe;
+    }
     var nodesEl = document.getElementById('map-nodes');
     if (!nodesEl) return;
     nodesEl.innerHTML = '';
@@ -183,6 +230,11 @@
     if (goldEl) goldEl.textContent = state.gold;
     var rationsEl = document.getElementById('home-rations');
     if (rationsEl) rationsEl.textContent = state.rations + '/5';
+    var alignEl = document.getElementById('home-align');
+    if (alignEl) {
+      alignEl.textContent = (state.alignment > 0 ? '+' : '') + (state.alignment || 0) +
+        ' · ' + g.DSH_Economy.alignmentTitle(state.alignment);
+    }
   }
 
   function renderHome() {
@@ -204,12 +256,14 @@
   }
 
   function newRun() {
-    // 保留 meta（金币/军粮/最高层），重置局内
+    // 保留 meta（金币/军粮/最高层/善恶），重置局内
     state.layer = 1;
     state.commander = null;
     state.pack = [];
     state.mapNodes = g.DSH_GameState.buildMapNodes();
     state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    state.route = null;
+    state.bossChoice = null;
     g.DSH_SaveSystem.clear();
     g.DSH_PopupRenderer.showCommanderPick(function (heroId) {
       var def = g.DSH_HEROES.byId(heroId);
@@ -217,7 +271,15 @@
       state.commander = { heroId: heroId, hp: hp, maxHp: hp, defense: 0, fabao: null };
       state.pack = g.DSH_GameState.buildPack(heroId);
       g.DSH_GameState.pushLog(state, '🏮 主将选定：' + def.nick + '（' + def.name + '）· 天赋『' + def.talent.name + '』');
-      showMap();
+      // 新手教学（流寇战）：仅第一次跑（meta.tutored），之后直接选路线
+      var meta = g.DSH_SaveSystem.getMeta();
+      if (meta.tutored) {
+        g.DSH_PopupRenderer.showMessage('⚔ 老练佣兵', '你已是走南闯北的老佣兵，直接选择本层的立场吧。', showRouteChoice);
+      } else {
+        g.DSH_PopupRenderer.showMessage('🏘 出生村·王下村',
+          '你是云游四方的雇佣兵，途经王下村，与村民阿大、阿二、阿三结识。\n村外流寇作乱——先联手击退他们！（新手教学战，无军粮消耗）',
+          function () { startBattle('tutorial'); });
+      }
     });
   }
 
@@ -230,9 +292,11 @@
     state.commander = d.commander;
     state.pack = d.pack;
     state.runBuffs = d.runBuffs || { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    state.route = d.route || null; // 旧档无路线 → 默认魔军
     state.gold = (meta.gold !== undefined) ? meta.gold : (d.gold || 0);
     state.rations = g.DSH_SaveSystem.rationsToday(); // 军粮为每日资源，以当日同步值为准
     state.bestLayer = meta.bestLayer || d.bestLayer || 0;
+    state.alignment = (meta.alignment !== undefined) ? meta.alignment : 0;
     showMap();
   }
 
@@ -323,10 +387,11 @@
   function init() {
     events = new g.DSH_EventSystem();
     state = g.DSH_GameState.createState();
-    // 跨局 meta：马蹄金 / 历史最高层（战败清档后仍保留）
+    // 跨局 meta：马蹄金 / 历史最高层 / 善恶值（战败清档后仍保留）
     var meta = g.DSH_SaveSystem.getMeta();
     if (meta.gold !== undefined) state.gold = meta.gold;
     if (meta.bestLayer) state.bestLayer = meta.bestLayer;
+    if (meta.alignment !== undefined) state.alignment = meta.alignment;
     g.DSH_CardRenderer.resetHpBars();
 
     pageEls = {
@@ -357,6 +422,14 @@
     showHome: showHome,
     showMap: showMap,
     newRun: newRun,
-    loadRun: loadRun
+    loadRun: loadRun,
+    showRouteChoice: showRouteChoice,
+    /** 测试用：强制当前战斗胜利（smoke-dom 走流程用） */
+    forceWin: function () {
+      state.enemies.forEach(function (e) { e.hp = 0; e.alive = false; });
+      if (state.boss) { state.boss.hp = 0; state.boss.alive = false; }
+      g.DSH_BattleSystem.checkWin(state);
+      handleBattleEnd();
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

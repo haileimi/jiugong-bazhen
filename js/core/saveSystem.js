@@ -31,6 +31,7 @@
       commander: state.commander,
       pack: state.pack,
       runBuffs: state.runBuffs,
+      route: state.route,       // 本层讨伐阵营（旧档无 → 默认魔军）
       gold: state.gold,
       rations: state.rations,
       bestLayer: state.bestLayer
@@ -40,8 +41,8 @@
   function save(state) {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(state)));
-      // 同步跨局 meta（马蹄金/最高层），保证战败清档后金币不丢
-      setMeta({ gold: state.gold, bestLayer: state.bestLayer || 0 });
+      // 同步跨局 meta（马蹄金/最高层/善恶），保证战败清档后不丢
+      setMeta({ gold: state.gold, bestLayer: state.bestLayer || 0, alignment: state.alignment || 0 });
       // 军粮日期同步（保证每日 5 点）
       localStorage.setItem(RATIONS_KEY, JSON.stringify({ date: today(), value: state.rations }));
       return true;
@@ -88,7 +89,7 @@
     } catch (e) { /* 忽略 */ }
   }
 
-  /** 跨局 meta（马蹄金 / 历史最高层）—— 战败清档后仍保留 */
+  /** 跨局 meta（马蹄金 / 历史最高层 / 善恶值）—— 战败清档后仍保留 */
   function getMeta() {
     try {
       var raw = localStorage.getItem(META_KEY);
@@ -105,6 +106,7 @@
       var m = getMeta();
       if (obj && obj.gold !== undefined) m.gold = obj.gold;
       if (obj && obj.bestLayer !== undefined) m.bestLayer = obj.bestLayer;
+      if (obj && obj.alignment !== undefined) m.alignment = obj.alignment;
       localStorage.setItem(META_KEY, JSON.stringify(m));
     } catch (e) { /* 忽略 */ }
   }

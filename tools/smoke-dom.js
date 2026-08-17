@@ -129,29 +129,48 @@ if (!elements['modal-root'] || elements['modal-root'].children.length === 0) {
 }
 console.log('✓ 选主将弹窗出现');
 
-// 3. 选穆奎（大山汉，血量厚）当主将
+// 3. 选穆奎（大山汉，血量厚）当主将 → 新手教学（流寇战）
 const dwPick = created.find((e) => String(e.className).indexOf('pick-card') >= 0 && String(e.innerHTML || '').indexOf('穆奎') >= 0);
 if (!dwPick) { console.error('✗ 未找到穆奎选将卡'); process.exit(1); }
 dwPick.click();
-const pageMap = elements['page-map'];
-if (!pageMap || pageMap.style.display === 'none') {
-  console.error('✗ 选将后未进入地图页');
-  process.exit(1);
-}
 const app = sandbox.DSH_APP;
 const st = app.getState();
 if (!st.commander || st.commander.heroId !== 'dw1' || st.pack.length !== 60) {
   console.error('✗ 主将/卡包初始化错误');
   process.exit(1);
 }
-console.log('✓ 主将选定穆奎，卡包 60 张，进入第 ' + st.layer + ' 层地图');
+// 出生村引导消息 → 确定 → 教学战
+const introOk = created.filter((e) => e.textContent === '确定').pop();
+if (!introOk) { console.error('✗ 未找到出生村引导按钮'); process.exit(1); }
+introOk.click();
+const pageBattle = elements['page-battle'];
+if (!pageBattle || pageBattle.style.display === 'none' || st.battleKind !== 'tutorial' || st.enemies.length !== 2) {
+  console.error('✗ 教学战未开始（kind=' + st.battleKind + ' 敌=' + (st.enemies || []).length + '）');
+  process.exit(1);
+}
+console.log('✓ 主将选定穆奎，卡包 60 张，流寇教学战开始（敌方 ' + st.enemies.length + ' 个）');
 
-// 4. 点击「小怪战斗点」进入战斗
+// 4. 强制打赢教学战 → 村子得救 → 路线选择 → 进入地图
+app.forceWin();
+const villageOk = created.filter((e) => e.textContent === '确定').pop();
+if (!villageOk) { console.error('✗ 未找到村子得救按钮'); process.exit(1); }
+villageOk.click();
+const routeGood = created.filter((e) => String(e.className || '').indexOf('route-btn') >= 0 &&
+  String(e.innerHTML || '').indexOf('正义路线') >= 0).pop();
+if (!routeGood) { console.error('✗ 未弹出路线选择'); process.exit(1); }
+routeGood.click();
+const pageMap = elements['page-map'];
+if (!pageMap || pageMap.style.display === 'none' || st.route !== 'evil') {
+  console.error('✗ 路线选择后未进入地图页（route=' + st.route + '）');
+  process.exit(1);
+}
+console.log('✓ 教学战通关，选择正义路线（讨伐曜魔宗），进入第 ' + st.layer + ' 层地图');
+
+// 5. 点击「小怪战斗点」进入战斗
 const monsterNode = created.find((e) => String(e.className).indexOf('map-node') >= 0 &&
   e.classList.contains('clickable') && String(e.innerHTML || '').indexOf('小怪战斗点') >= 0);
 if (!monsterNode) { console.error('✗ 未找到可进入的小怪战斗点'); process.exit(1); }
 monsterNode.click();
-const pageBattle = elements['page-battle'];
 if (!pageBattle || pageBattle.style.display === 'none') {
   console.error('✗ 未进入战斗页');
   process.exit(1);
@@ -162,7 +181,7 @@ if (st.phase !== 'player' || st.hand.length === 0 || st.enemies.length !== 2) {
 }
 console.log('✓ 小怪战开始：手牌 ' + st.hand.length + ' 张，天机 ' + st.tianji + '/' + st.maxTianji + '，敌方 ' + st.enemies.length + ' 个');
 
-// 5. 打出一张自身/全体类卡牌（若有），否则打出任意单体卡
+// 6. 打出一张自身/全体类卡牌（若有），否则打出任意单体卡
 const selfUid = st.hand.find((u) => {
   const d = sandbox.DSH_GameState.cardDef(st, u);
   return d && d.target !== 'single';
