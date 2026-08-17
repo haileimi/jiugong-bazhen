@@ -194,7 +194,7 @@
 
   function schemeWith(state, events, card, hero, enemyId) {
     if (hero.fillHand) {
-      // 白泽：手牌抽满至 10 张
+      // 白泽：手牌抽满至 9 张
       var want = GS().HAND_MAX - state.hand.length;
       if (want > 0) {
         var cards = g.DSH_TurnSystem.drawFromPack(state, want);

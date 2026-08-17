@@ -1,15 +1,21 @@
 /**
- * cardRenderer.js — 招式卡 / 主将卡渲染（v3）
+ * cardRenderer.js — 招式卡渲染（v3.10 简约 1:1 方形卡）
  *
- * 招式卡（偏将）：手牌区重叠排列，点选后放大 20% + 轻微摆动（CSS .selected）。
- * 主将卡：战场底部，显示血量 + 防御两条条。
- * 立绘路径：images/hero/<英雄id>/<皮肤id>.png（缺失降级为类别图标）。
+ * 招式卡（偏将）：手牌区 9 宫格放置，1:1 方形 —— 类别符号 + 诨名 + 效果描述（无立绘）。
+ * 点选后放大 + 轻微摆动（CSS .selected）。主将/敌方卡渲染在 battleRenderer。
  */
 (function (g) {
   'use strict';
 
   var CAT_ICON = { '战斗': '⚔', '护卫': '🛡', '计谋': '🔮' };
   var TARGET_TEXT = { single: '单体', all: '全体', self: '自身' };
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
 
   /** 卡面右上角数值（攻击/防御/关键数） */
   function statNumber(hero) {
@@ -23,7 +29,7 @@
     if (hero.draw > 0) return hero.draw;
     if (hero.tianjiUp > 0) return '天+1';
     if (hero.atkDown > 0) return hero.atkDown;
-    if (hero.fillHand) return 10;
+    if (hero.fillHand) return 9;
     return '';
   }
 
@@ -38,7 +44,7 @@
     if (hero.draw > 0) return '抽 ' + hero.draw + ' 张';
     if (hero.tianjiUp > 0) return '本场天机上限 +1';
     if (hero.atkDown > 0) return '目标攻击 -' + hero.atkDown + '%';
-    if (hero.fillHand) return '手牌抽满至 10';
+    if (hero.fillHand) return '手牌抽满至 9';
     return '';
   }
 
@@ -61,65 +67,27 @@
 
   function resetHpBars() { prevBar = {}; }
 
-  function imageSrc(hero, skinId) {
-    return 'images/hero/' + hero.id + '/' + (skinId || 'default') + '.png?v=3';
-  }
-
-  /** 招式卡（手牌，王国之战卡牌风：青横幅/金角标/插画区/棕木信息板） */
+  /** 招式卡（手牌，简约 1:1 方形：类别符号 + 诨名 + 效果） */
   function createHandCard(hero, state, uid) {
     var card = document.createElement('div');
-    card.className = 'hero-card hand-card kc-card' + (state.usedThisTurn[uid] ? ' acted' : '');
+    card.className = 'hero-card hand-card' + (state.usedThisTurn[uid] ? ' acted' : '');
     card.dataset.uid = uid;
     card.dataset.heroId = hero.id;
     card.dataset.target = hero.target;
 
-    // 左上角金色角标：数值（攻击/防御）
-    var badge = document.createElement('div');
-    badge.className = 'kc-badge';
-    badge.textContent = statNumber(hero);
-    badge.title = statText(hero);
-    card.appendChild(badge);
+    var symbol = el('div', 'sc-symbol', CAT_ICON[hero.category] || '?');
+    card.appendChild(symbol);
 
-    // 右上角青色横幅：角色（谋士/防护/战斗）+ 诨名
-    var banner = document.createElement('div');
-    banner.className = 'kc-banner';
-    var role = document.createElement('span');
-    role.className = 'kc-role';
-    role.textContent = CAT_ICON[hero.category] || '?';
-    var name = document.createElement('span');
-    name.className = 'kc-name';
-    name.textContent = hero.nick;
-    banner.appendChild(role);
-    banner.appendChild(name);
-    banner.title = hero.name + ' · ' + hero.category + ' · ' + (TARGET_TEXT[hero.target] || '');
-    card.appendChild(banner);
+    var name = el('div', 'sc-name', hero.nick);
+    name.title = hero.name + ' · ' + hero.category + ' · ' + (TARGET_TEXT[hero.target] || '');
+    card.appendChild(name);
 
-    // 插画区（黑底 + 立绘 + 纹理 + 光）
-    var art = document.createElement('div');
-    art.className = 'kc-art';
-    var img = document.createElement('img');
-    img.className = 'kc-art-img';
-    img.alt = hero.nick;
-    img.draggable = false;
-    img.src = imageSrc(hero, 'default');
-    img.onerror = function () {
-      img.style.display = 'none';
-      var fb = document.createElement('div');
-      fb.className = 'kc-art-fb';
-      fb.textContent = CAT_ICON[hero.category] || '?';
-      art.appendChild(fb);
-    };
-    art.appendChild(img);
-    card.appendChild(art);
+    var stat = el('div', 'sc-stat', statText(hero));
+    card.appendChild(stat);
 
-    // 底部棕木信息板（效果描述）
-    var plate = document.createElement('div');
-    plate.className = 'kc-plate';
-    var plateText = document.createElement('span');
-    plateText.textContent = hero.desc;
-    plate.appendChild(plateText);
-    plate.title = hero.desc;
-    card.appendChild(plate);
+    var desc = el('div', 'sc-desc', hero.desc);
+    desc.title = hero.desc;
+    card.appendChild(desc);
 
     return card;
   }
@@ -129,7 +97,6 @@
     TARGET_TEXT: TARGET_TEXT,
     statNumber: statNumber,
     statText: statText,
-    imageSrc: imageSrc,
     setHpBar: setHpBar,
     resetHpBars: resetHpBars,
     createHandCard: createHandCard

@@ -62,41 +62,38 @@
     return card;
   }
 
-  /* ---------------- 战场 5 区：魔王区 / 小鬼区 / 界河区 / 副将区（手牌）/ 主将区 ---------------- */
+  /* ---------------- 战场：9宫格小鬼区 / 界河区 / 9宫格副将区（手牌） ---------------- */
 
-  /** 魔王区：魔王本体大卡（仅魔王战） */
-  function renderBossZone(state) {
-    var zone = document.getElementById('boss-zone');
-    if (!zone) return;
-    zone.innerHTML = '';
-    if (state.battleKind !== 'boss' || !state.boss) return;
-    var bossCard = createEnemyCard(state.boss, state, true);
-    bossCard.classList.add('boss-card');
-    if (g.DSH_GameState.bossUnlocked(state) && state.boss.hp > 0) {
-      bossCard.classList.add('boss-unlocked', 'targetable');
-    }
-    zone.appendChild(bossCard);
-  }
-
-  /** 小鬼区：敌方小怪（宽 331；魔王战 5 只 2+3 两排，小怪战单排） */
+  /** 小鬼区：9宫格敌方（魔王战：本体居中 + 5 魔将围绕；小怪战：第 1 行左右 2 只） */
   function renderEnemyRow(state) {
-    var row = document.getElementById('enemy-row');
-    if (!row) return;
-    row.innerHTML = '';
+    var grid = document.getElementById('enemy-row');
+    if (!grid) return;
+    grid.innerHTML = '';
 
-    var isBossBattle = state.battleKind === 'boss';
-    var rows = isBossBattle ? [2, 3] : [state.enemies.length]; // 魔王战 2-3 / 小怪战单排
-    var idx = 0;
-    rows.forEach(function (n) {
-      var line = el('div', 'enemy-line');
-      for (var i = 0; i < n && idx < state.enemies.length; i++, idx++) {
-        var e = state.enemies[idx];
-        var c = createEnemyCard(e, state, false);
-        if (g.DSH_GameState.enemyAlive(state, e.id)) c.classList.add('targetable');
-        line.appendChild(c);
+    var slots = [];
+    if (state.battleKind === 'boss') {
+      slots.push({ idx: 4, e: state.boss, boss: true });
+      var gens = [0, 1, 2, 3, 5];
+      state.enemies.forEach(function (e, i) { slots.push({ idx: gens[i], e: e, boss: false }); });
+    } else {
+      state.enemies.forEach(function (e, i) { slots.push({ idx: i === 0 ? 3 : 5, e: e, boss: false }); });
+    }
+
+    for (var c = 0; c < 9; c++) {
+      var cell = el('div', 'grid-cell');
+      var slot = null;
+      for (var i = 0; i < slots.length; i++) if (slots[i].idx === c) { slot = slots[i]; break; }
+      if (slot) {
+        var card = createEnemyCard(slot.e, state, slot.boss);
+        if (slot.boss) card.classList.add('boss-card');
+        if (g.DSH_GameState.enemyAlive(state, slot.e.id)) card.classList.add('targetable');
+        cell.appendChild(card);
+      } else {
+        cell.classList.add('empty');
+        cell.appendChild(el('div', 'cell-dot', '·'));
       }
-      if (line.children.length) row.appendChild(line);
-    });
+      grid.appendChild(cell);
+    }
   }
 
   function renderEnemyTargets(state) {
@@ -124,72 +121,63 @@
     state.lastHits = [];
   }
 
-  /* ---------------- 界河 ---------------- */
+  /* ---------------- 界河区（只 1-2 行文字：回合数 + 已抽到的卦象） ---------------- */
   function renderRiver(state) {
     var turnEl = document.getElementById('river-turn');
     var hexEl = document.getElementById('river-hex');
-    var hintEl = document.getElementById('river-hint');
-    if (turnEl) turnEl.textContent = '第 ' + state.turn + ' 回合 · 第 ' + state.layer + ' 层' +
-      (state.battleKind === 'boss' ? ' · 魔王战' : ' · 小怪战');
+    if (turnEl) {
+      turnEl.textContent = '第 ' + state.turn + ' 回合 · 第 ' + state.layer + ' 层' +
+        (state.battleKind === 'boss' ? ' · 魔王战' : ' · 小怪战');
+    }
     if (hexEl) {
       var lines = '';
-      // 下卦
-      if (state.lowerTrigram) {
-        var lo = g.DSH_TRIGRAMS.byId(state.lowerTrigram);
-        lines += '<div class="hex-line"><span class="hex-tag">下卦</span> ' + lo.symbol + lo.name +
-          '：<span class="hex-effect">' + lo.desc + '</span></div>';
-      } else {
-        lines += '<div class="hex-line dim"><span class="hex-tag">下卦</span> 未抽（第 3 回合）</div>';
-      }
-      // 上卦
-      if (state.upperTrigram) {
-        var up = g.DSH_TRIGRAMS.byId(state.upperTrigram);
-        lines += '<div class="hex-line"><span class="hex-tag">上卦</span> ' + up.symbol + up.name +
-          '：<span class="hex-effect">' + up.desc + '</span></div>';
-      } else {
-        lines += '<div class="hex-line dim"><span class="hex-tag">上卦</span> 未抽（第 5 回合）</div>';
-      }
-      // 天命（64 卦）
       if (state.currentHexagram) {
         var hex = state.currentHexagram;
-        lines += '<div class="hex-line tianming"><span class="hex-tag">天命</span> 『' + hex.name + '』 ' +
-          hex.upperSymbol + hex.lowerSymbol + '：<span class="hex-effect">' + hex.effectText + '</span></div>';
+        lines = '<div class="hex-line tianming"><span class="hex-tag">天命</span> 『' + hex.name + '』 ' +
+          hex.upperSymbol + hex.lowerSymbol + '：' + hex.effectText + '</div>';
       } else {
-        lines += '<div class="hex-line dim"><span class="hex-tag">天命</span> 未觉醒（第 7 回合）</div>';
+        var parts = [];
+        if (state.lowerTrigram) {
+          var lo = g.DSH_TRIGRAMS.byId(state.lowerTrigram);
+          parts.push('<span class="hex-tag">下卦</span> ' + lo.symbol + lo.name);
+        }
+        if (state.upperTrigram) {
+          var up = g.DSH_TRIGRAMS.byId(state.upperTrigram);
+          parts.push('<span class="hex-tag">上卦</span> ' + up.symbol + up.name);
+        }
+        if (parts.length) lines = '<div class="hex-line">' + parts.join('　') + '</div>';
       }
-      hexEl.innerHTML = lines;
-    }
-    if (hintEl) {
-      if (state.over) hintEl.textContent = state.over === 'win' ? '🏆 战斗胜利！' : '💀 主将战死……';
-      else if (state.phase === 'player') hintEl.textContent = '点手牌 → 放大摆动 → 点怪物攻击；护卫/计谋点出即打';
-      else if (state.phase === 'boss') hintEl.textContent = '怪物行动中……';
+      hexEl.innerHTML = lines; // 无卦象时为空 → 只显示回合数
     }
   }
 
-  /* ---------------- 副将区（手牌，宽 331，每排 3 张 → 5 张为 3+2 两排） ---------------- */
-  var HAND_ROW_SIZE = 3;
-
+  /* ---------------- 副将区（手牌，9宫格 3×3，最多 9 张） ---------------- */
   function renderHand(state) {
-    var zone = document.getElementById('hand-zone');
-    if (!zone) return;
-    zone.innerHTML = '';
-    if (state.hand.length === 0) {
-      zone.appendChild(el('div', 'hand-empty', '手牌已空（回合结束自动补 5 张）'));
-      return;
-    }
+    var grid = document.getElementById('hand-zone');
+    if (!grid) return;
+    grid.innerHTML = '';
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
-    for (var r = 0; r < state.hand.length; r += HAND_ROW_SIZE) {
-      var row = el('div', 'hand-row', '');
-      state.hand.slice(r, r + HAND_ROW_SIZE).forEach(function (uid) {
+    for (var c = 0; c < 9; c++) {
+      var cell = el('div', 'grid-cell');
+      if (c < state.hand.length) {
+        var uid = state.hand[c];
         var hero = g.DSH_GameState.cardDef(state, uid);
-        if (!hero) return;
-        var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
-        if (uid === selUid) card.classList.add('selected');
-        row.appendChild(card);
-      });
-      zone.appendChild(row);
+        if (hero) {
+          var card = g.DSH_CardRenderer.createHandCard(hero, state, uid);
+          if (uid === selUid) card.classList.add('selected');
+          cell.appendChild(card);
+        } else {
+          cell.classList.add('empty');
+        }
+      } else if (state.hand.length === 0 && c === 4) {
+        cell.classList.add('empty', 'note');
+        cell.textContent = '手牌已空';
+      } else {
+        cell.classList.add('empty');
+      }
+      grid.appendChild(cell);
     }
   }
 
@@ -216,20 +204,8 @@
     var def = g.DSH_HEROES.byId(state.commander.heroId);
 
     var bottom = el('div', 'commander-bottom');
-    // 头像
-    var avatar = el('div', 'commander-avatar');
-    var img = document.createElement('img');
-    img.className = 'commander-avatar-img';
-    img.alt = def.nick;
-    img.src = g.DSH_CardRenderer.imageSrc(def, 'default');
-    img.onerror = function () {
-      img.style.display = 'none';
-      var fb = el('div', 'commander-avatar-fb', g.DSH_CardRenderer.CAT_ICON[def.category] || '🏮');
-      avatar.appendChild(fb);
-    };
-    avatar.appendChild(img);
-    avatar.appendChild(el('div', 'commander-avatar-name', def.nick));
-    bottom.appendChild(avatar);
+    // 头像（无立绘，用类别符号）
+    bottom.appendChild(el('div', 'commander-avatar', g.DSH_CardRenderer.CAT_ICON[def.category] || '🏮'));
 
     // 信息区：名字+天赋 / 血量 / 防御 / 法宝·卡包·天机
     var info = el('div', 'commander-info');
@@ -294,7 +270,6 @@
   }
 
   function renderAll(state) {
-    renderBossZone(state);
     renderEnemyRow(state);
     renderRiver(state);
     renderCommander(state);
@@ -517,7 +492,6 @@
     TABS: TABS,
     createEnemyCard: createEnemyCard,
     renderAll: renderAll,
-    renderBossZone: renderBossZone,
     renderEnemyRow: renderEnemyRow,
     renderRiver: renderRiver,
     renderHand: renderHand,

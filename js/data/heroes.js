@@ -81,7 +81,7 @@
       talent: { name: '天算', desc: '每场战斗免死一次（致命伤保留 1 血）', type: 'onceSave' },
       hp: 10, skins: [{ id: 'default', name: '原版' }] },
     { id: 'bz1', nick: '白泽',   name: '玄机',   category: '计谋', element: '水', target: 'self',
-      fillHand: true, desc: '将手牌抽满至 10 张（多出的回归卡包）',
+      fillHand: true, desc: '将手牌抽满至 9 张（多出的回归卡包）',
       talent: { name: '神兽之智', desc: '起手 7 张', type: 'drawBonus', value: 2 },
       hp: 10, skins: [{ id: 'default', name: '原版' }] }
   ];

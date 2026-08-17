@@ -230,7 +230,7 @@
     var st = GS.createState({ random: seqRng([0.5]) });
     check('初始天机 3', st.tianji === 3);
     check('默认天机上限 3', st.maxTianji === 3);
-    check('手牌上限 10（不可改）', GS.HAND_MAX === 10);
+    check('手牌上限 9（9宫格）', GS.HAND_MAX === 9);
     check('初始阶段 home', st.phase === 'home');
     check('初始层数 1', st.layer === 1);
     check('地图节点 4 个', st.mapNodes.length === 4);
@@ -266,7 +266,7 @@
     stBz.pack = GS.buildPack('bz1');
     g.DSH_TurnSystem.startBattle(stBz, new g.DSH_EventSystem(), 'monster');
     check('白泽主将起手 7 张', stBz.hand.length === 7);
-    check('白泽天赋不改手牌上限', GS.HAND_MAX === 10);
+    check('白泽天赋不改手牌上限', GS.HAND_MAX === 9);
 
     /* ============ 13. 出牌：单体战斗（8 项） ============ */
     var b2 = setupPlay([0.99, 0.99]); // 不暴击、不特技
@@ -312,8 +312,8 @@
     var b6 = setupPlay([0.5]);
     b6.st.hand = ['bz1#0'];
     BS.playCard(b6.st, b6.ev, 'bz1#0', null);
-    check('白泽：手牌抽满至 10', b6.st.hand.length === GS.HAND_MAX);
-    check('白泽：不超过 10（多出的回卡包）', b6.st.hand.length <= GS.HAND_MAX);
+    check('白泽：手牌抽满至 9', b6.st.hand.length === GS.HAND_MAX);
+    check('白泽：不超过 9（多出的回卡包）', b6.st.hand.length <= GS.HAND_MAX);
 
     /* ============ 17. 单体指向：护卫/计谋减益（4 项） ============ */
     var b7 = setupPlay([0.5]);
