@@ -254,27 +254,37 @@
     o.box.appendChild(btn);
   }
 
-  /** 营帐：休息 + 随机 buff（本层生效） */
+  /** 营帐：休息 + 三选一 buff（本层生效） */
   function showCamp(state, onDone) {
     clear();
     var o = overlay('camp-modal');
-    o.box.innerHTML = '<h2>⛺ 营帐</h2><p class="modal-sub">扎营休息：恢复全部血量，并获得一个本层 buff</p>';
-    var btn = document.createElement('button');
-    btn.className = 'primary-btn';
-    btn.textContent = '扎营休息';
-    btn.addEventListener('click', function () {
-      state.commander.hp = state.commander.maxHp;
-      var pool = [
-        { key: 'battlePct', value: 10, text: '本层战斗牌伤害 +10%' },
-        { key: 'defPct', value: 10, text: '本层主将受击伤害 -10%' },
-        { key: 'tianjiBonus', value: 1, text: '本层每回合天机 +1' }
-      ];
-      var pick = pool[Math.floor(state.rnd() * pool.length)];
-      state.runBuffs[pick.key] = (state.runBuffs[pick.key] || 0) + pick.value;
-      clear();
-      g.DSH_PopupRenderer.showMessage('⛺ 休整完毕', '血量已回满。获得 buff：' + pick.text, onDone);
+    o.box.innerHTML = '<h2>⛺ 营帐</h2><p class="modal-sub">扎营休息：恢复全部血量，并从以下 buff 中<b>三选一</b>（本层生效）</p>';
+    var pool = [
+      { key: 'battlePct', value: 10, text: '⚔ 本层战斗牌伤害 +10%' },
+      { key: 'defPct', value: 10, text: '🛡 本层主将受击伤害 -10%' },
+      { key: 'tianjiBonus', value: 1, text: '🧠 本层每回合天机 +1' },
+      { key: 'drawBonus', value: 1, text: '🃏 本层每回合多抽 1 张' },
+      { key: 'goldPct', value: 20, text: '💰 本层战斗胜利金币 +20%' },
+      { key: 'critPct', value: 10, text: '⚡ 本层战斗牌暴击率 +10%' },
+      { key: 'startShield', value: 4, text: '🔰 本层每场战斗开局获得 4 点护盾' }
+    ];
+    // 随机抽 3 个不重复选项
+    var opts = [];
+    while (opts.length < 3 && pool.length > 0) {
+      opts.push(pool.splice(Math.floor(state.rnd() * pool.length), 1)[0]);
+    }
+    opts.forEach(function (pick) {
+      var btn = document.createElement('button');
+      btn.className = 'primary-btn buff-opt';
+      btn.textContent = pick.text;
+      btn.addEventListener('click', function () {
+        state.commander.hp = state.commander.maxHp;
+        state.runBuffs[pick.key] = (state.runBuffs[pick.key] || 0) + pick.value;
+        clear();
+        g.DSH_PopupRenderer.showMessage('⛺ 休整完毕', '血量已回满。获得 buff：' + pick.text, onDone);
+      });
+      o.box.appendChild(btn);
     });
-    o.box.appendChild(btn);
   }
 
   /** 随机事件：buff 或 debuff */
@@ -283,12 +293,16 @@
     var good = [
       { key: 'battlePct', value: 15, text: '本层战斗牌伤害 +15%' },
       { key: 'defPct', value: 10, text: '本层主将受击伤害 -10%' },
-      { key: 'heal', value: 10, text: '立即恢复 10 点血量' }
+      { key: 'heal', value: 10, text: '立即恢复 10 点血量' },
+      { key: 'goldPct', value: 30, text: '本层战斗胜利金币 +30%' },
+      { key: 'drawBonus', value: 1, text: '本层每回合多抽 1 张' }
     ];
     var bad = [
       { key: 'enemyAtkPct', value: 10, text: '本层怪物攻击 +10%' },
       { key: 'loseHp', value: 8, text: '失去 8 点血量' },
-      { key: 'battlePct', value: -10, text: '本层战斗牌伤害 -10%' }
+      { key: 'battlePct', value: -10, text: '本层战斗牌伤害 -10%' },
+      { key: 'defPct', value: -10, text: '本层主将受击伤害 +10%' },
+      { key: 'loseGold', value: 15, text: '被盗匪洗劫，失去 15 马蹄金' }
     ];
     var isGood = state.rnd() < 0.5;
     var pool = isGood ? good : bad;
@@ -304,6 +318,11 @@
     if (pick.key === 'loseHp') {
       state.commander.hp = Math.max(1, state.commander.hp - pick.value);
       g.DSH_PopupRenderer.showMessage(title, pick.text + '（剩余 ' + state.commander.hp + ' 血）', onDone);
+      return;
+    }
+    if (pick.key === 'loseGold') {
+      state.gold = Math.max(0, (state.gold || 0) - pick.value);
+      g.DSH_PopupRenderer.showMessage(title, pick.text + '（剩余 ' + state.gold + ' 马蹄金）', onDone);
       return;
     }
     state.runBuffs[pick.key] = (state.runBuffs[pick.key] || 0) + pick.value;

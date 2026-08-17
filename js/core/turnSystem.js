@@ -29,6 +29,8 @@
     if (talent && talent.type === 'drawBonus') bonus = talent.value;
     // 法宝：河图洛书 —— 每回合多抽 1 张
     if (state.commander && state.commander.fabao === 'hetuluoshu') bonus += 1;
+    // 层 buff：营帐/奇遇 —— 每回合多抽 N 张
+    bonus += state.runBuffs.drawBonus || 0;
     var want = GS().BASE_DRAW + bonus - state.hand.length;
     if (want > 0) {
       var cards = drawFromPack(state, want);
@@ -131,10 +133,15 @@
 
     // 防御每场归零；铁脚汉主将天赋开局自带防御
     state.commander.defense = 0;
-    var talent = GS().commanderDef(state).talent;
+    var talent = GS().commanderDef(state) && GS().commanderDef(state).talent;
     if (talent && talent.type === 'startDefense') {
       state.commander.defense += talent.value;
       GS().pushLog(state, '🛡 主将天赋『' + talent.name + '』：开局获得 ' + talent.value + ' 点防御');
+    }
+    // 层 buff：营帐/奇遇 —— 每场战斗开局获得护盾
+    if ((state.runBuffs.startShield || 0) > 0) {
+      state.commander.defense += state.runBuffs.startShield;
+      GS().pushLog(state, '🛡 本层护盾：开局额外 ' + state.runBuffs.startShield + ' 点防御');
     }
 
     state.tianji = maxTianji(state);

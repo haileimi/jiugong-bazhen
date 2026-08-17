@@ -77,6 +77,8 @@
   function victoryRewards(state) {
     var isBoss = state.battleKind === 'boss';
     var gold = isBoss ? BOSS_GOLD : MONSTER_GOLD;
+    // 层 buff：营帐/奇遇 —— 战斗胜利金币加成
+    if ((state.runBuffs.goldPct || 0) !== 0) gold = Math.round(gold * (100 + state.runBuffs.goldPct) / 100);
     var rationBase = isBoss ? BOSS_RATIONS : MONSTER_RATIONS;
     var rationGained = Math.max(0, Math.min(RATIONS_MAX - state.rations, rationBase));
     var cards = [];

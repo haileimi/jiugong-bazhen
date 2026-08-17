@@ -890,6 +890,16 @@ body {
   font-weight: bold;
 }
 
+/* 营帐三选一 buff 按钮：纵向堆叠 */
+.buff-opt {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
 /* ============ 窄屏适配 ============ */
 @media (max-width: 800px) {
   body { justify-content: flex-start; }

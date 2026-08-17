@@ -80,7 +80,7 @@
       pack: [],                 // [{ uid, heroId }]
       hand: [],                 // [uid]
       mapNodes: buildMapNodes(),
-      runBuffs: { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 },
+      runBuffs: { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0, drawBonus: 0, goldPct: 0, critPct: 0, startShield: 0 },
       route: null,              // 本层讨伐阵营：'good'(官军/山河盟) | 'evil'(曜魔宗军) | null(未选)
       saved: false,
 

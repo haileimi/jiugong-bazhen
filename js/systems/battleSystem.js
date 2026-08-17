@@ -97,7 +97,7 @@
     var talent = GS().commanderDef(state).talent;
     if (talent && talent.type === 'battlePct') payload.mult *= (100 + talent.value) / 100;
     if (hero.target === 'all' && talent && talent.type === 'aoePct') payload.mult *= (100 + talent.value) / 100;
-    if ((state.runBuffs.battlePct || 0) > 0) payload.mult *= (100 + state.runBuffs.battlePct) / 100;
+    if ((state.runBuffs.battlePct || 0) !== 0) payload.mult *= (100 + state.runBuffs.battlePct) / 100;
     // 法宝：赤霄剑 —— 战斗牌伤害 +15%
     if (state.commander.fabao === 'chixiaojian') payload.mult *= 1.15;
     if (!state.firstCardPlayedThisTurn) {
@@ -112,7 +112,8 @@
 
     function hitOne(enemy) {
       var crit = payload.crit;
-      if (!crit && state.rnd() < (BASE_CRIT + (talent && talent.type === 'critRate' ? talent.value / 100 : 0))) crit = true;
+      if (!crit && state.rnd() < (BASE_CRIT + (state.runBuffs.critPct || 0) / 100 +
+        (talent && talent.type === 'critRate' ? talent.value / 100 : 0))) crit = true;
       var critMult = CRIT_MULT + (talent && talent.type === 'critDmg' ? talent.value / 100 : 0);
       var mult = payload.mult * g.DSH_ELEMENTS.counterMult(hero.element, enemy.element);
       var bonus = payload.bonus;

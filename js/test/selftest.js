@@ -61,7 +61,7 @@
     st.firstCardPlayedThisTurn = false;
     st.freeChase = {};
     st.tianjiUpApplied = false;
-    st.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    st.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0, drawBonus: 0, goldPct: 0, critPct: 0, startShield: 0 };
     st.stats = { revived: false, firstAttackDone: false, attackCountThisTurn: 0,
       consecutiveAttacks: 0, comboBonus: 0, nextAttackCrit: false, onceSaveUsed: false };
     st.over = null;
@@ -620,6 +620,62 @@
       s.alignment = before;
       return s.alignment === -10;
     })());
+
+    /* ============ 28. 层 buff 池：营帐/奇遇新增 buff（10 项） ============ */
+    // 默认 runBuffs 含全部新 key
+    check('默认 runBuffs 含 4 新 key', (function () {
+      var s = GS.createState({ random: seqRng([0.5]) });
+      return s.runBuffs.drawBonus === 0 && s.runBuffs.goldPct === 0 &&
+        s.runBuffs.critPct === 0 && s.runBuffs.startShield === 0;
+    })());
+
+    // drawBonus：每回合多抽 1 张（5→6）
+    var u1 = setupPlay([0.5]);
+    u1.st.runBuffs.drawBonus = 1;
+    g.DSH_TurnSystem.drawHand(u1.st, u1.ev);
+    check('drawBonus：起手抽到 6 张', u1.st.hand.length === 6);
+
+    // goldPct：战斗胜利金币 +20%（小怪 15 → 18）
+    var u2 = setupEconomy([0.5]).st;
+    u2.gold = 0;
+    u2.runBuffs.goldPct = 20;
+    var rw2 = EC.victoryRewards(u2);
+    check('goldPct：小怪战金币 15→18', rw2.gold === 18 && u2.gold === 18);
+
+    // startShield：每场战斗开局护盾
+    var u3 = GS.createState({ random: seqRng([0.5]) });
+    u3.commander = { heroId: 'dw1', hp: 14, maxHp: 14, defense: 0 };
+    u3.pack = GS.buildPack('dw1');
+    u3.runBuffs.startShield = 4;
+    g.DSH_TurnSystem.startBattle(u3, new g.DSH_EventSystem(), 'monster');
+    check('startShield：开局 4 点护盾', u3.commander.defense === 4);
+
+    // critPct：暴击率 +10%（0.15 ∈ [0.1, 0.2) → 仅 critPct 存在时暴击 ×1.5）
+    var u4 = setupPlay([0.15, 0.99]);
+    u4.st.hand = ['wz1#0'];
+    u4.st.runBuffs.critPct = 10;
+    var tgt4 = u4.st.enemies[0];
+    var r4 = BS.playCard(u4.st, u4.ev, 'wz1#0', tgt4.id);
+    var expectCrit = Math.max(2, Math.round(16 * E.counterMult('火', tgt4.element) * 1.5));
+    check('critPct：触发暴击伤害 ×1.5（' + expectCrit + '）', r4 && r4.damage === expectCrit, 'got ' + (r4 && r4.damage));
+
+    // 凶兆 battlePct -10：减伤生效（修复前无效）
+    var u5 = setupPlay([0.99, 0.99]);
+    u5.st.hand = ['wz1#0'];
+    u5.st.runBuffs.battlePct = -10;
+    var tgt5 = u5.st.enemies[0];
+    var expect5 = Math.max(2, Math.round(16 * E.counterMult('火', tgt5.element) * 0.9));
+    var r5 = BS.playCard(u5.st, u5.ev, 'wz1#0', tgt5.id);
+    check('凶兆 battlePct -10%：伤害降低生效（' + expect5 + '）', r5 && r5.damage === expect5, 'got ' + (r5 && r5.damage));
+
+    // 正向 battlePct 不回归
+    var u6 = setupPlay([0.99, 0.99]);
+    u6.st.hand = ['wz1#0'];
+    u6.st.runBuffs.battlePct = 10;
+    var tgt6 = u6.st.enemies[0];
+    var expect6 = Math.max(2, Math.round(16 * E.counterMult('火', tgt6.element) * 1.1));
+    var r6 = BS.playCard(u6.st, u6.ev, 'wz1#0', tgt6.id);
+    check('正向 battlePct +10%：伤害提升（' + expect6 + '）', r6 && r6.damage === expect6, 'got ' + (r6 && r6.damage));
 
     /* ============ 汇总 ============ */
     details = assert.slice();

@@ -85,7 +85,7 @@
       state.alignment = state.bossChoice === 'good' ? -10 : 10;
       state.layer += 1;
       state.mapNodes = g.DSH_GameState.buildMapNodes();
-      state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+      state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0, drawBonus: 0, goldPct: 0, critPct: 0, startShield: 0 };
       var settle = g.DSH_Economy.settleAlignment(state); // 周期结算：金币 + 下一层层 buff
       state.bossChoice = null;
       syncMeta();
@@ -261,7 +261,7 @@
     state.commander = null;
     state.pack = [];
     state.mapNodes = g.DSH_GameState.buildMapNodes();
-    state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    state.runBuffs = { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0, drawBonus: 0, goldPct: 0, critPct: 0, startShield: 0 };
     state.route = null;
     state.bossChoice = null;
     g.DSH_SaveSystem.clear();
@@ -297,7 +297,7 @@
     state.mapNodes = d.mapNodes;
     state.commander = d.commander;
     state.pack = d.pack;
-    state.runBuffs = d.runBuffs || { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0 };
+    state.runBuffs = d.runBuffs || { battlePct: 0, defPct: 0, enemyAtkPct: 0, tianjiBonus: 0, drawBonus: 0, goldPct: 0, critPct: 0, startShield: 0 };
     state.route = d.route || null; // 旧档无路线 → 默认魔军
     state.gold = (meta.gold !== undefined) ? meta.gold : (d.gold || 0);
     state.rations = g.DSH_SaveSystem.rationsToday(); // 军粮为每日资源，以当日同步值为准
