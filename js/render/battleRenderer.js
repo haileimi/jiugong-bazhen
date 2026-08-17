@@ -33,8 +33,7 @@
     card.appendChild(nameRow);
 
     var atkLine = el('div', 'enemy-atk', '攻 ' + g.DSH_GameState.enemyAtk(state, enemy) +
-      (enemy.aoe ? ' · 全体' : '') + (state.atkDebuff[enemy.id] ? ' · 削弱-' + state.atkDebuff[enemy.id] + '%' : '') +
-      ' · ' + g.DSH_ELEMENTS.ICON[enemy.element] + enemy.element);
+      (enemy.aoe ? '·全体' : '') + (state.atkDebuff[enemy.id] ? '·削' + state.atkDebuff[enemy.id] + '%' : ''));
     card.appendChild(atkLine);
 
     var bar = el('div', 'enemy-hpbar' + (isBoss ? ' boss-hpbar' : ''));
@@ -62,9 +61,9 @@
     return card;
   }
 
-  /* ---------------- 战场：9宫格小鬼区 / 界河区 / 9宫格副将区（手牌） ---------------- */
+  /* ---------------- 战场：5×3 小鬼区 / 一格界河 / 5×3 副将区（手牌） ---------------- */
 
-  /** 小鬼区：9宫格敌方（魔王战：本体居中 + 5 魔将围绕；小怪战：第 1 行左右 2 只） */
+  /** 小鬼区：5×3 敌方（魔王战：5 魔将第 1 行 + 本体居中；小怪战：2 只第 1 行） */
   function renderEnemyRow(state) {
     var grid = document.getElementById('enemy-row');
     if (!grid) return;
@@ -72,14 +71,13 @@
 
     var slots = [];
     if (state.battleKind === 'boss') {
-      slots.push({ idx: 4, e: state.boss, boss: true });
-      var gens = [0, 1, 2, 3, 5];
-      state.enemies.forEach(function (e, i) { slots.push({ idx: gens[i], e: e, boss: false }); });
+      slots.push({ idx: 7, e: state.boss, boss: true });           // 第 2 行居中
+      state.enemies.forEach(function (e, i) { slots.push({ idx: i, e: e, boss: false }); }); // 第 1 行 5 只
     } else {
-      state.enemies.forEach(function (e, i) { slots.push({ idx: i === 0 ? 3 : 5, e: e, boss: false }); });
+      state.enemies.forEach(function (e, i) { slots.push({ idx: i === 0 ? 1 : 3, e: e, boss: false }); });
     }
 
-    for (var c = 0; c < 9; c++) {
+    for (var c = 0; c < 15; c++) {
       var cell = el('div', 'grid-cell');
       var slot = null;
       for (var i = 0; i < slots.length; i++) if (slots[i].idx === c) { slot = slots[i]; break; }
@@ -151,7 +149,7 @@
     }
   }
 
-  /* ---------------- 副将区（手牌，9宫格 3×3，最多 9 张） ---------------- */
+  /* ---------------- 副将区（手牌，5×3 网格，最多 9 张） ---------------- */
   function renderHand(state) {
     var grid = document.getElementById('hand-zone');
     if (!grid) return;
@@ -159,7 +157,7 @@
     var sel = document.querySelector('.hand-card.selected');
     var selUid = sel ? sel.dataset.uid : null;
 
-    for (var c = 0; c < 9; c++) {
+    for (var c = 0; c < 15; c++) {
       var cell = el('div', 'grid-cell');
       if (c < state.hand.length) {
         var uid = state.hand[c];
@@ -171,7 +169,7 @@
         } else {
           cell.classList.add('empty');
         }
-      } else if (state.hand.length === 0 && c === 4) {
+      } else if (state.hand.length === 0 && c === 7) {
         cell.classList.add('empty', 'note');
         cell.textContent = '手牌已空';
       } else {
