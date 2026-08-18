@@ -113,8 +113,30 @@
     { id: 'cm3', nick: '阿三', name: '账房阿三', category: '计谋', element: '水', target: 'self',
       draw: 2, desc: '抽 2 张牌',
       talent: { name: '精打细算', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
-      hp: 7, defense: 1, alignment: 2, speed: 5, range: 3, starter: true, skins: [{ id: 'default', name: '原版' }] }
+      hp: 7, defense: 1, alignment: 2, speed: 5, range: 3, starter: true, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- v4 金将：佣兵王·楚烈（通关奖励/金将挑战获得，不入常规卡池） ---------- */
+    { id: 'g1', nick: '楚烈', name: '佣兵王·楚烈', category: '战斗', element: '火', target: 'single',
+      damage: 22, desc: '对目标造成 22 点伤害，15% 暴击 ×1.5；邻位光环：左右相邻格英雄攻击 +10%',
+      skill: { name: '佣兵王令', chance: 0.15, critDmg: 1.5 },
+      aura: { atkPct: 10 }, // 邻位光环：影响左右相邻格
+      talent: { name: '佣兵王令', desc: '邻位光环：左右相邻格英雄攻击 +10%', type: 'auraAtk', value: 10 },
+      hp: 15, defense: 3, alignment: 5, speed: 6, range: 1, skins: [{ id: 'default', name: '原版' }] }
   ];
+
+  /** v4 稀有度（灰/绿/蓝/金）：村民=灰、老英雄=绿、新英雄+白泽=蓝、楚烈=金 */
+  var RARITY_BY_ID = {
+    wz1: '绿', wz2: '绿', wz3: '绿', gs1: '绿', gs2: '绿',
+    qb1: '绿', qb2: '绿', qb3: '绿', dw1: '绿', dw2: '绿', ms1: '绿', ms2: '绿',
+    bz1: '蓝', wz4: '蓝', qb4: '蓝', ms3: '蓝',
+    cm1: '灰', cm2: '灰', cm3: '灰',
+    g1: '金'
+  };
+
+  /** 稀有度 → 布阵点消耗 */
+  var RARITY_COST = { '灰': 1, '绿': 2, '蓝': 3, '金': 4 };
+  /** 稀有度 → 卡框颜色 */
+  var RARITY_COLOR = { '灰': '#9e9e9e', '绿': '#4caf50', '蓝': '#42a5f5', '金': '#ffd700' };
 
   /**
    * 只读视图展开（v3.10 全角色卡牌模型：攻击/防御/种类/血量/技能/天赋/姓名/诨号/
@@ -125,15 +147,20 @@
   var VIEW = HEROES.map(function (h) {
     var defaultRange = h.range !== undefined ? h.range : (h.category === '战斗' ? 1 : 3);
     var portrait = 'images/hero/' + h.id + '/default.png';
+    var rarity = RARITY_BY_ID[h.id] || '绿';
     return {
       id: h.id, nick: h.nick, name: h.name,
       category: h.category, element: h.element, target: h.target,
       desc: h.desc, hp: h.hp,
+      rarity: rarity,                             // v4 稀有度：灰/绿/蓝/金
+      gold: rarity === '金',                      // 金将：不入常规卡池，靠奖励/事件获得
+      deployCost: RARITY_COST[rarity],            // 布阵点消耗：灰1/绿2/蓝3/金4
       attack: h.damage || 0,                       // 攻击
       defense: h.defense !== undefined ? h.defense : (h.category === '护卫' ? 2 : 1), // 防御
       alignment: h.alignment !== undefined ? h.alignment : 0, // 善恶值（-10~+10）
       speed: h.speed || 5,                         // 速度
       range: defaultRange,                         // 射程
+      aura: h.aura || null,                        // 邻位光环（影响左右相邻格）
       portrait: h.portrait || portrait,            // 立绘
       avatar: h.avatar || portrait,                // 头像
       damage: h.damage || 0,
@@ -163,15 +190,20 @@
   g.DSH_HEROES = {
     CATEGORY: CATEGORY,
     HEROES: VIEW,
+    RARITY_BY_ID: RARITY_BY_ID,
+    RARITY_COST: RARITY_COST,
+    RARITY_COLOR: RARITY_COLOR,
     byId: byId,
     skinsOf: skinsOf,
     defaultSkinId: defaultSkinId,
     skinOf: skinOf,
     /** 初始队友（村民等 starter）：每局保证入包 */
     STARTERS: VIEW.filter(function (h) { return h.starter; }),
-    /** 卡包牌型：主将之外的非 starter 英雄（偏将=招式） */
+    /** 金将（通关奖励/事件获得，不入常规卡池） */
+    GOLD_HEROES: VIEW.filter(function (h) { return h.gold; }),
+    /** 卡包牌型：主将之外的非 starter、非金将英雄（偏将=招式） */
     packHeroIds: function (commanderId) {
-      return VIEW.filter(function (h) { return h.id !== commanderId && !h.starter; })
+      return VIEW.filter(function (h) { return h.id !== commanderId && !h.starter && !h.gold; })
         .map(function (h) { return h.id; });
     }
   };

@@ -20,15 +20,39 @@
   var DEFENSE_RESET = true; // 每场战斗防御归零
   var COMMANDER_HP_MULT = 4; // 主将血量倍率（原英雄血量×4，可调）
 
-  /** 卡包构成：主将外的 15 名英雄 × 4 = 60 张（uid 唯一） */
+  /* ---- v4 布阵点（天机=布阵消耗） ---- */
+  var DEPLOY_BASE = 3;      // 初始布阵点
+  var DEPLOY_LAYER_GAIN = 1; // 每通关一层 +1
+  var DEPLOY_LEVEL_CAP = 6;  // 顶级封顶 6 点
+  var DEPLOY_CAP = 9;        // 加上法宝后最高 9 点
+
+  /** 卡包构成：主将外的偏将英雄 × 4（uid 唯一）；v4 每张带战时等级 */
   function buildPack(commanderId) {
     var pack = [];
     g.DSH_HEROES.packHeroIds(commanderId).forEach(function (heroId) {
       for (var i = 0; i < PACK_COPIES; i++) {
-        pack.push({ uid: heroId + '#' + i, heroId: heroId });
+        pack.push({ uid: heroId + '#' + i, heroId: heroId, warLevel: 0 });
       }
     });
     return pack;
+  }
+
+  /** 当前可用布阵点：3 + 每层+1（封顶 6），法宝加成后最高 9（v4） */
+  function deployPoints(state) {
+    var p = DEPLOY_BASE + Math.min(state.layer - 1, DEPLOY_LEVEL_CAP - DEPLOY_BASE);
+    if (state.commander && state.commander.fabao && g.DSH_EconomySystem &&
+        g.DSH_EconomySystem.FABAOS) {
+      var f = g.DSH_EconomySystem.FABAOS[state.commander.fabao];
+      if (f && f.deployBonus) p += f.deployBonus;
+    }
+    return Math.min(p, DEPLOY_CAP);
+  }
+
+  /** 战时等级后缀：0=无，1=+，2=++ */
+  function warLevelSuffix(level) {
+    var s = '';
+    for (var i = 0; i < (level || 0); i++) s += '+';
+    return s;
   }
 
   /** 地图节点：每层固定 4 个（小怪 → 营帐 → 随机事件 → 魔王） */
@@ -213,6 +237,12 @@
     BASE_TIANJI: BASE_TIANJI,
     DEFENSE_RESET: DEFENSE_RESET,
     COMMANDER_HP_MULT: COMMANDER_HP_MULT,
+    DEPLOY_BASE: DEPLOY_BASE,
+    DEPLOY_LAYER_GAIN: DEPLOY_LAYER_GAIN,
+    DEPLOY_LEVEL_CAP: DEPLOY_LEVEL_CAP,
+    DEPLOY_CAP: DEPLOY_CAP,
+    deployPoints: deployPoints,
+    warLevelSuffix: warLevelSuffix,
     createState: createState,
     buildPack: buildPack,
     buildMapNodes: buildMapNodes,

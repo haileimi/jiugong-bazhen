@@ -158,15 +158,39 @@
       check('英雄 ' + h.id + ' 主将血量>0', h.hp > 0);
       catSet[h.category] = true;
     });
-    check('英雄共 19 名（16 常规 + 村民 3）', H.HEROES.length === 19);
-    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 19);
-    check('全英雄卡字段完整（攻/防/种类/血/技能/天赋/名/诨号/立绘/头像/关键值/简介/五行/善恶/速/射程）', H.HEROES.every(function (h) {
+    check('英雄共 20 名（16 常规 + 村民 3 + 金将楚烈）', H.HEROES.length === 20);
+    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 20);
+    check('全英雄卡字段完整（攻/防/种类/血/技能/天赋/名/诨号/立绘/头像/关键值/简介/五行/善恶/速/射程/稀有度/布阵消耗）', H.HEROES.every(function (h) {
       return h.id && h.nick && h.name && h.category && h.element && h.hp > 0 && h.desc &&
         h.attack !== undefined && h.defense !== undefined && h.alignment !== undefined &&
         h.speed > 0 && h.range > 0 && h.portrait && h.avatar &&
+        ['灰', '绿', '蓝', '金'].indexOf(h.rarity) >= 0 && h.deployCost >= 1 &&
         (typeof h.skill === 'object' || h.skill === null) && !!h.talent && typeof h.talent.name === 'string' &&
         typeof h.talent.type === 'string';
     }));
+    // v4 稀有度划分
+    check('村民 3 人为灰色', ['cm1', 'cm2', 'cm3'].every(function (id) { return H.byId(id).rarity === '灰'; }));
+    check('12 老英雄为绿色', ['wz1', 'wz2', 'wz3', 'gs1', 'gs2', 'qb1', 'qb2', 'qb3', 'dw1', 'dw2', 'ms1', 'ms2']
+      .every(function (id) { return H.byId(id).rarity === '绿'; }));
+    check('新英雄+白泽为蓝色', ['bz1', 'wz4', 'qb4', 'ms3'].every(function (id) { return H.byId(id).rarity === '蓝'; }));
+    check('布阵消耗 灰1/绿2/蓝3/金4', H.RARITY_COST['灰'] === 1 && H.RARITY_COST['绿'] === 2 &&
+      H.RARITY_COST['蓝'] === 3 && H.RARITY_COST['金'] === 4);
+    // 金将楚烈
+    check('金将楚烈在册且为金色', !!H.byId('g1') && H.byId('g1').rarity === '金' && H.byId('g1').gold === true);
+    check('楚烈：战斗/近战/攻22/主将血60(15×4)', H.byId('g1').category === '战斗' && H.byId('g1').damage === 22 &&
+      H.byId('g1').hp * GS.COMMANDER_HP_MULT === 60);
+    check('楚烈有邻位光环（左右+10% 攻）', H.byId('g1').aura && H.byId('g1').aura.atkPct === 10);
+    check('楚烈不入常规卡池', !GS.buildPack('wz1').some(function (c) { return c.heroId === 'g1'; }));
+    check('楚烈布阵消耗 4 点', H.byId('g1').deployCost === 4);
+    // 布阵点（v4）
+    var stDp = GS.createState({ random: seqRng([0.5]) });
+    stDp.layer = 1;
+    check('布阵点初始 3', GS.deployPoints(stDp) === 3);
+    stDp.layer = 4;
+    check('布阵点 4 层时 6（封顶）', GS.deployPoints(stDp) === 6);
+    stDp.layer = 9;
+    check('布阵点永不超 6（法宝加成前）', GS.deployPoints(stDp) === 6);
+    check('战时等级后缀：0/1/2 → 无/+ /++', GS.warLevelSuffix(0) === '' && GS.warLevelSuffix(1) === '+' && GS.warLevelSuffix(2) === '++');
     check('三类齐全：战斗', catSet['战斗'] === true);
     check('三类齐全：护卫', catSet['护卫'] === true);
     check('三类齐全：计谋', catSet['计谋'] === true);
