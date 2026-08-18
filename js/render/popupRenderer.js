@@ -179,12 +179,14 @@
     render(null);
   }
 
-  /** 招募所：花金招募指定偏将招式卡（onClose 关闭时回调） */
+  /** 招募所：一次展示 3 个候选英雄（按稀有度标价）+ 刷新（收费）+ 返回 */
   function showRecruit(state, onClose) {
     clear();
     var o = overlay('recruit-modal');
     var box = o.box;
-    function render(msg) {
+    var candidates = [];
+
+    function render(msg, heroes) {
       box.innerHTML = '';
       var title = document.createElement('h2');
       title.textContent = '🏮 招募所';
@@ -194,7 +196,7 @@
       if (!g.DSH_Economy.hasRun(state)) {
         sub.textContent = '⚠ 还没有进行中的战斗，请先「开始战斗」。招募的招式卡将加入当前局卡包。';
       } else {
-        sub.textContent = '花 ' + g.DSH_Economy.RECRUIT_PRICE + ' 金招募指定偏将招式卡 ×1（卡包可超 48 成长）';
+        sub.textContent = '一次展示 3 位英雄 · 按稀有度标价 · 刷新 ' + g.DSH_Economy.RECRUIT_REFRESH_PRICE + ' 金 · 0.1% 概率刷出金将';
       }
       box.appendChild(sub);
       var bal = document.createElement('div');
@@ -208,36 +210,60 @@
         line.textContent = msg;
         box.appendChild(line);
       }
+      // 3 个候选
       var grid = document.createElement('div');
       grid.className = 'recruit-grid';
-      g.DSH_HEROES.HEROES.forEach(function (h) {
+      (heroes || []).forEach(function (hid) {
+        var h = g.DSH_HEROES.byId(hid);
+        if (!h) return;
         var isCommander = state.commander && h.id === state.commander.heroId;
-        var affordable = g.DSH_Economy.hasRun(state) && !isCommander && state.gold >= g.DSH_Economy.RECRUIT_PRICE;
+        var price = g.DSH_Economy.recruitPrice(h);
+        var affordable = g.DSH_Economy.hasRun(state) && !isCommander && state.gold >= price;
         var cell = document.createElement('button');
-        cell.className = 'recruit-card recruit-cat-' + h.category +
+        cell.className = 'recruit-card recruit-rarity-' + h.rarity + ' recruit-cat-' + h.category +
           (isCommander ? ' commander' : '') + (affordable ? '' : ' unaffordable');
         cell.innerHTML =
           '<div class="recruit-icon">' + (g.DSH_CardRenderer.CAT_ICON[h.category] || '🏮') + '</div>' +
           '<div class="recruit-info">' +
           '<div class="recruit-name">' + h.nick + ' <span class="pack-sub">' + h.name + ' · ' + h.element + '</span></div>' +
           '<div class="recruit-desc">' + h.desc + '</div>' +
-          '<div class="recruit-price">' + (isCommander ? '主将 · 不可招募' : g.DSH_Economy.RECRUIT_PRICE + ' 金 / 1 张') + '</div>' +
+          '<div class="recruit-price"><span class="rarity-tag ' + h.rarity + '">' + h.rarity + '</span> ' +
+          (isCommander ? '主将 · 不可招募' : price + ' 金 / 1 张') + '</div>' +
           '</div>';
         if (!isCommander && g.DSH_Economy.hasRun(state)) {
           cell.addEventListener('click', function () {
-            render(g.DSH_Economy.recruitHero(state, h.id).msg);
+            var r = g.DSH_Economy.recruitHero(state, h.id);
+            render(r.msg, candidates);
           });
         }
         grid.appendChild(cell);
       });
       box.appendChild(grid);
-      var closeBtn = document.createElement('button');
-      closeBtn.className = 'primary-btn';
-      closeBtn.textContent = '关闭';
-      closeBtn.addEventListener('click', function () { clear(); if (onClose) onClose(); });
-      box.appendChild(closeBtn);
+      // 操作行：刷新 + 返回
+      var actions = document.createElement('div');
+      actions.className = 'recruit-actions';
+      var refreshBtn = document.createElement('button');
+      refreshBtn.className = 'mid-btn';
+      refreshBtn.textContent = '🔄 刷新（' + g.DSH_Economy.RECRUIT_REFRESH_PRICE + ' 金）';
+      if (!g.DSH_Economy.hasRun(state) || state.gold < g.DSH_Economy.RECRUIT_REFRESH_PRICE) {
+        refreshBtn.disabled = true;
+      }
+      refreshBtn.addEventListener('click', function () {
+        var r = g.DSH_Economy.refreshRecruit(state);
+        candidates = r.heroes;
+        render(r.msg, candidates);
+      });
+      actions.appendChild(refreshBtn);
+      var backBtn = document.createElement('button');
+      backBtn.className = 'primary-btn recruit-back';
+      backBtn.textContent = '返回';
+      backBtn.addEventListener('click', function () { clear(); if (onClose) onClose(); });
+      actions.appendChild(backBtn);
+      box.appendChild(actions);
     }
-    render(null);
+
+    if (g.DSH_Economy.hasRun(state)) candidates = g.DSH_Economy.recruitRoll(state);
+    render(null, candidates);
   }
 
   /** 败局弹窗 */

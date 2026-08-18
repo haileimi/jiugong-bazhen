@@ -533,6 +533,27 @@
     check('招募偏将成功：-20 金、卡包 +1', rec1.ok && e6.st.gold === 80 && e6.st.pack.length === 61);
     check('不可招募主将自己', !EC.recruitHero(e6.st, 'dw1').ok);
 
+    // v4 招募所：3 候选 + 稀有度定价 + 刷新收费
+    check('招募价格按稀有度：灰10/绿20/蓝40/金100', EC.recruitPrice(g.DSH_HEROES.byId('cm1')) === 10 &&
+      EC.recruitPrice(g.DSH_HEROES.byId('wz1')) === 20 &&
+      EC.recruitPrice(g.DSH_HEROES.byId('bz1')) === 40 &&
+      EC.recruitPrice(g.DSH_HEROES.byId('g1')) === 100);
+    var e7 = setupEconomy([0.5]);
+    e7.st.gold = 100;
+    var roll1 = EC.recruitRoll(e7.st);
+    check('招募候选恰 3 个', roll1.length === 3);
+    check('候选不含主将', roll1.every(function (id) { return id !== 'dw1'; }));
+    var gold0 = e7.st.gold;
+    var rf = EC.refreshRecruit(e7.st);
+    check('刷新扣 ' + EC.RECRUIT_REFRESH_PRICE + ' 金', rf.ok && e7.st.gold === gold0 - EC.RECRUIT_REFRESH_PRICE && rf.heroes.length === 3);
+    e7.st.gold = 2;
+    check('金币不足刷新被拒', !EC.refreshRecruit(e7.st).ok && e7.st.gold === 2);
+    // 0.1% 金将：rnd 第一格 < 0.001 出金将
+    var e8 = setupEconomy([0.0]);
+    e8.st.gold = 100;
+    var rollGold = EC.recruitRoll(e8.st);
+    check('0.1% 概率刷出金将（rnd=0 时）', rollGold[0] === 'g1');
+
     // 军粮消耗（进战斗门槛）
     check('军粮 0 时不可进战斗', (function () {
       var s = setupEconomy([0.5]).st;

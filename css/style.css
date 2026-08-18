@@ -1679,3 +1679,35 @@ body {
 
 /* ---- 首页善恶值 ---- */
 #home-align { font-size: 13px; }
+
+/* ---- 招募所 v4：3 候选 + 稀有度标价 + 刷新/返回 ---- */
+.recruit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.recruit-actions .mid-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.recruit-back { margin-top: 0; }
+.rarity-tag {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #1a120b;
+  font-weight: bold;
+  margin-right: 4px;
+}
+.rarity-tag.灰 { background: #9e9e9e; }
+.rarity-tag.绿 { background: #4caf50; }
+.rarity-tag.蓝 { background: #42a5f5; }
+.rarity-tag.金 { background: #ffd700; }
+.recruit-rarity-金 {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+.recruit-rarity-蓝 { border-color: #42a5f5; }
+.recruit-rarity-绿 { border-color: #4caf50; }
+.recruit-rarity-灰 { border-color: #9e9e9e; }

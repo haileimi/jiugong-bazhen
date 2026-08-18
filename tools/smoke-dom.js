@@ -247,24 +247,41 @@ const shopClose = created.filter((e) => e.textContent === '关闭').pop();
 if (!shopClose) { console.error('✗ 商店无关闭按钮'); process.exit(1); }
 shopClose.click();
 
-// 9. 招募所弹窗：打开 → 主将不可招募 → 关闭
+// 9. 招募所弹窗：3 候选 + 标价 + 刷新（扣金）+ 返回
 const recruitBtn = elements['home-recruit-btn'];
 if (!recruitBtn) { console.error('✗ 未找到招募所按钮'); process.exit(1); }
 recruitBtn.click();
-const recruitCard = created.filter((e) => String(e.className || '').indexOf('recruit-card') >= 0).pop();
-if (!recruitCard) {
-  console.error('✗ 招募所未渲染英雄列表');
+const recruitCards = created.filter((e) => String(e.className || '').indexOf('recruit-card') >= 0);
+if (recruitCards.length === 0) {
+  console.error('✗ 招募所未渲染候选英雄');
   process.exit(1);
 }
-if (!created.some((e) => String(e.className || '').indexOf('recruit-card') >= 0 &&
-  String(e.innerHTML || '').indexOf('主将 · 不可招募') >= 0)) {
-  console.error('✗ 主将未被标记为不可招募');
+if (recruitCards.length > 3) {
+  console.error('✗ 招募所候选超过 3 个（实际 ' + recruitCards.length + '）');
   process.exit(1);
 }
-console.log('✓ 招募所弹窗正常，主将不可招募');
-const recruitClose = created.filter((e) => e.textContent === '关闭').pop();
-if (!recruitClose) { console.error('✗ 招募所无关闭按钮'); process.exit(1); }
-recruitClose.click();
+const priceOk = recruitCards.every((e) => /金 \/ 1 张|不可招募/.test(String(e.innerHTML || '')));
+if (!priceOk) { console.error('✗ 候选未标注价格'); process.exit(1); }
+console.log('✓ 招募所一次展示 ' + recruitCards.length + ' 位候选，均已标价');
+const refreshBtn = created.filter((e) => String(e.className || '').indexOf('mid-btn') >= 0 &&
+  String(e.textContent || '').indexOf('刷新') >= 0).pop();
+if (!refreshBtn) { console.error('✗ 招募所无刷新按钮'); process.exit(1); }
+const goldBefore = app.getState().gold;
+refreshBtn.click();
+const goldAfter = app.getState().gold;
+if (goldBefore > 0 && goldAfter >= goldBefore) {
+  console.error('✗ 刷新未扣金币（' + goldBefore + ' → ' + goldAfter + '）');
+  process.exit(1);
+}
+console.log('✓ 刷新按钮正常（扣 ' + (goldBefore - goldAfter) + ' 金）');
+const recruitBack = created.filter((e) => String(e.className || '').indexOf('recruit-back') >= 0).pop();
+if (!recruitBack) { console.error('✗ 招募所无返回按钮'); process.exit(1); }
+recruitBack.click();
+if (elements['modal-root'].children.length !== 0) {
+  console.error('✗ 招募所返回后弹窗未关闭');
+  process.exit(1);
+}
+console.log('✓ 招募所返回按钮正常，弹窗已关闭');
 
 // 10. 战斗自检仍然可跑
 const res = sandbox.DSH_Selftest.run();

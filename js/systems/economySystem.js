@@ -24,8 +24,46 @@
   var MONSTER_CARD_CHANCE = 0.35; // 小怪战掉落英雄卡概率
   var PACK_CARD_PRICE = 30;       // 商店：随机偏将招式卡
   var RATION_PRICE = 15;          // 商店：军粮 +1
-  var RECRUIT_PRICE = 20;         // 招募所：指定偏将 1 张
+  var RECRUIT_PRICE = 20;         // 招募所：基准价（绿将，保留兼容）
   var FABAO_PRICE = 60;           // 商店：法宝（装备主将，替换旧法宝）
+
+  /* ---- v4 招募所：一次 3 候选、按稀有度定价、刷新收费、0.1% 金将 ---- */
+  var RECRUIT_SLOTS = 3;                    // 一次展示候选数
+  var RECRUIT_REFRESH_PRICE = 5;            // 刷新一次费用
+  var RECRUIT_GOLD_CHANCE = 0.001;          // 每候选位出金将概率（0.1%）
+  var RECRUIT_PRICES = { '灰': 10, '绿': 20, '蓝': 40, '金': 100 }; // 按稀有度定价
+
+  /** 该英雄的招募价格（按稀有度） */
+  function recruitPrice(hero) {
+    return RECRUIT_PRICES[hero.rarity] !== undefined ? RECRUIT_PRICES[hero.rarity] : RECRUIT_PRICE;
+  }
+
+  /** 生成 3 个招募候选：每格 0.1% 金将，否则非主将/非金将英雄随机 */
+  function recruitRoll(state) {
+    var pool = g.DSH_HEROES.HEROES.filter(function (h) {
+      return h.id !== (state.commander && state.commander.heroId) && !h.gold;
+    });
+    var golds = g.DSH_HEROES.GOLD_HEROES;
+    var out = [];
+    for (var i = 0; i < RECRUIT_SLOTS; i++) {
+      if (state.rnd() < RECRUIT_GOLD_CHANCE && golds.length > 0) {
+        out.push(golds[Math.floor(state.rnd() * golds.length)].id);
+      } else {
+        out.push(pool[Math.floor(state.rnd() * pool.length)].id);
+      }
+    }
+    return out;
+  }
+
+  /** 刷新招募候选：扣刷新费（不足返回错误） */
+  function refreshRecruit(state) {
+    if (!hasRun(state)) return { ok: false, msg: '还没有进行中的战斗，请先「开始战斗」', heroes: [] };
+    if (state.gold < RECRUIT_REFRESH_PRICE) {
+      return { ok: false, msg: '马蹄金不足（刷新需 ' + RECRUIT_REFRESH_PRICE + ' 金）', heroes: [] };
+    }
+    state.gold -= RECRUIT_REFRESH_PRICE;
+    return { ok: true, msg: '已刷新（-' + RECRUIT_REFRESH_PRICE + ' 金）', heroes: recruitRoll(state) };
+  }
 
   /* ---------------- 法宝（商店购买，装备主将，战斗生效） ---------------- */
   var FABAOS = [
@@ -117,14 +155,15 @@
     return { ok: true, msg: '军粮 +1（现 ' + state.rations + '/' + RATIONS_MAX + '）' };
   }
 
-  /** 招募所：指定偏将招式卡 +1（主将不可招募） */
+  /** 招募所：指定偏将招式卡 +1（主将不可招募；按稀有度定价） */
   function recruitHero(state, heroId) {
     if (!hasRun(state)) return { ok: false, msg: '还没有进行中的战斗，请先「开始战斗」' };
     if (heroId === state.commander.heroId) return { ok: false, msg: '主将是「你」，不可招募自己的招式' };
-    if (state.gold < RECRUIT_PRICE) return { ok: false, msg: '马蹄金不足（需要 ' + RECRUIT_PRICE + '）' };
-    state.gold -= RECRUIT_PRICE;
-    addCardToPack(state, heroId);
     var h = g.DSH_HEROES.byId(heroId);
+    var price = recruitPrice(h);
+    if (state.gold < price) return { ok: false, msg: '马蹄金不足（需要 ' + price + '）' };
+    state.gold -= price;
+    addCardToPack(state, heroId);
     return { ok: true, msg: '招募成功：『' + h.nick + ' · ' + h.name + '』招式卡 ×1', card: heroId };
   }
 
@@ -210,6 +249,13 @@
     buyPackCard: buyPackCard,
     buyRation: buyRation,
     recruitHero: recruitHero,
+    recruitPrice: recruitPrice,
+    recruitRoll: recruitRoll,
+    refreshRecruit: refreshRecruit,
+    RECRUIT_SLOTS: RECRUIT_SLOTS,
+    RECRUIT_REFRESH_PRICE: RECRUIT_REFRESH_PRICE,
+    RECRUIT_GOLD_CHANCE: RECRUIT_GOLD_CHANCE,
+    RECRUIT_PRICES: RECRUIT_PRICES,
     fabaoOf: fabaoOf,
     buyFabao: buyFabao,
     alignmentTitle: alignmentTitle,
