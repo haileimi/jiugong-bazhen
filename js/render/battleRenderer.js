@@ -64,7 +64,7 @@
     return card;
   }
 
-  /* ---------------- 战场：5×3 小鬼区 / 一格界河 / 5×3 副将区（手牌） ---------------- */
+  /* ---------------- 战场：3×3 小鬼区 / 一格界河 / 3×3 副将区（手牌）/ 主角（底部） ---------------- */
 
   /** 敌方部门（与我军镜像：上谋略部 / 中远程部 / 下近战部，同部门隔界河相对） */
   var ENEMY_DEPTS = [
@@ -87,7 +87,7 @@
     zone.appendChild(bossCard);
   }
 
-  /** 小鬼区：5×3 敌方（5 魔将按定位归镜像部门，排内居中） */
+  /** 小鬼区：3×3 敌方（按定位归镜像部门，排内居中） */
   function renderEnemyRow(state) {
     var zone = document.getElementById('enemy-row');
     if (!zone) return;
@@ -103,8 +103,8 @@
       row.appendChild(el('span', 'dept-symbol', dept.symbol));
       row.appendChild(el('span', 'dept-label', dept.name));
 
-      var start = Math.max(0, Math.floor((5 - units.length) / 2));
-      for (var c = 0; c < 5; c++) {
+      var start = Math.max(0, Math.floor((3 - units.length) / 2));
+      for (var c = 0; c < 3; c++) {
         var cell = el('div', 'grid-cell');
         var idx = c - start;
         if (idx >= 0 && idx < units.length) {
@@ -177,7 +177,7 @@
     }
   }
 
-  /* ---------------- 副将区（手牌，5×3 分排：近战/远程/谋略，按定位归排居中） ---------------- */
+  /* ---------------- 副将区（手牌，3×3 分排：近战/远程/谋略，按定位归排居中） ---------------- */
   var DEPTS = [
     { cat: '战斗', name: '近战部', symbol: '⚔️' },
     { cat: '护卫', name: '远程部', symbol: '🏹' },
@@ -204,9 +204,9 @@
       row.appendChild(el('span', 'dept-symbol', dept.symbol));
       row.appendChild(el('span', 'dept-label', dept.name));
 
-      // 居中排列（5 格内居中）
-      var start = Math.max(0, Math.floor((5 - cards.length) / 2));
-      for (var c = 0; c < 5; c++) {
+      // 居中排列（3 格内居中）
+      var start = Math.max(0, Math.floor((3 - cards.length) / 2));
+      for (var c = 0; c < 3; c++) {
         var cell = el('div', 'grid-cell');
         var idx = c - start;
         if (idx >= 0 && idx < cards.length) {

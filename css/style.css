@@ -172,7 +172,7 @@ body {
   border-radius: 8px;
 }
 
-/* ---- 战场 5×3 网格通用格子 ---- */
+/* ---- 战场 3×3 网格通用格子 ---- */
 .grid-cell {
   display: flex;
   align-items: center;
@@ -193,7 +193,7 @@ body {
   flex: none;
 }
 
-/* ---- 小鬼区：5×3 敌方（与其他模块同宽） ---- */
+/* ---- 小鬼区：3×3 敌方（与其他模块同宽） ---- */
 #enemy-zone {
   width: 100%;
   background: var(--panel);
@@ -1029,7 +1029,7 @@ body {
 
 .map-actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ---- 副将区（手牌，5×3 分排：近战/远程/谋略，与其他模块同宽） ---- */
+/* ---- 副将区（手牌，3×3 分排：近战/远程/谋略，与其他模块同宽） ---- */
 #hand-zone {
   width: 100%;
   display: flex;
@@ -1042,11 +1042,11 @@ body {
   min-height: 0;
 }
 
-/* 部门排：近战部⚔️ / 远程部🏹 / 谋略部🪶（符号浅浅地衬在背景上） */
+/* 部门排：近战部⚔️ / 远程部🏹 / 谋略部🪶（3×3 九宫格，符号浅浅地衬在背景上） */
 .dept-row {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 5px;
 }
 .dept-row .grid-cell { position: relative; z-index: 1; }
