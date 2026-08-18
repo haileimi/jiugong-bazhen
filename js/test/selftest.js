@@ -731,6 +731,76 @@
     var r6 = BS.playCard(u6.st, u6.ev, 'wz1#0', tgt6.id);
     check('正向 battlePct +10%：伤害提升（' + expect6 + '）', r6 && r6.damage === expect6, 'got ' + (r6 && r6.damage));
 
+    /* ============ 27. v4 自动战斗引擎（布阵 + 自动回合 + 卦象三选一） ============ */
+    var AB = g.DSH_AutoBattle;
+    function setupAuto(seq, kind) {
+      var st = GS.createState({ random: seqRng(seq || [0.5]) });
+      st.commander = { heroId: 'mc1', hp: 40, maxHp: 40, defense: 0 };
+      st.pack = GS.buildPack('mc1');
+      var ev = new g.DSH_EventSystem();
+      AB.setupBattle(st, ev, kind || 'monster', kind === 'tutorial' ? { autoDeploy: true } : undefined);
+      return { st: st, ev: ev };
+    }
+
+    var a1 = setupAuto([0.5]);
+    check('布阵候选 9 张', a1.st.candidates.length === 9);
+    check('布阵点初始 3', a1.st.deployLeft === 3);
+    check('布阵阶段', a1.st.phase === 'deploy');
+    check('敌方已布位：2 流寇在敌方近战排', a1.st.enemies.every(function (e) {
+      return Math.floor(a1.st.enemySlot[e.id] / 3) === 2;
+    }));
+    var uidG = a1.st.candidates.filter(function (u) { return GS.cardDef(a1.st, u).category === '战斗'; })[0];
+    var uidY = a1.st.candidates.filter(function (u) { return GS.cardDef(a1.st, u).category === '护卫'; })[0];
+    check('战斗卡放近战排成功', AB.deployUnit(a1.st, null, uidG, 0).ok === true);
+    check('布阵扣点（绿=2，剩 1）', a1.st.deployLeft === 1);
+    check('护卫卡放近战排被拒（排须匹配）', AB.deployUnit(a1.st, null, uidY, 0).ok === false);
+    check('布阵点不足被拒', !AB.deployUnit(a1.st, null, uidY, 4).ok);
+    check('撤阵退点', AB.undeployUnit(a1.st, uidG).ok && a1.st.deployLeft === 3 && a1.st.formation[0] === null);
+    AB.startFight(a1.st, a1.ev);
+    check('开战后进入自动战斗', a1.st.phase === 'fight');
+    check('格子加成已掷（敌我各 9 格）', a1.st.playerBuffs.filter(Boolean).length === 9 &&
+      a1.st.enemyBuffs.filter(Boolean).length === 9);
+    var logLen0 = a1.st.log.length;
+    AB.advanceRound(a1.st, a1.ev);
+    check('自动回合推进到第 2 回合', a1.st.turn === 2);
+    check('本轮有自动行动日志', a1.st.log.length > logLen0);
+
+    // 教学战：固定阵容自动布阵
+    var a2 = setupAuto([0.5], 'tutorial');
+    check('教学战自动布阵：阿大(0)+阿二(4)', a2.st.formation[0] && a2.st.formation[0].heroId === 'cm1' &&
+      a2.st.formation[4] && a2.st.formation[4].heroId === 'cm2');
+    check('教学战直接开打', a2.st.phase === 'fight');
+    check('教学战敌方 = 2 流寇', a2.st.enemies.length === 2);
+
+    // 胜负判定
+    var a3 = setupAuto([0.5]);
+    AB.startFight(a3.st, a3.ev);
+    a3.st.enemies.forEach(function (e) { e.hp = 0; e.alive = false; });
+    AB.checkWin(a3.st);
+    check('敌方全灭判胜', a3.st.over === 'win');
+    var a4 = setupAuto([0.5]);
+    a4.st.commander.hp = 0;
+    AB.checkWin(a4.st);
+    check('主角战死判负', a4.st.over === 'lose');
+
+    // 卦象 3/5 三选一挂起、7 天命自动（敌我血拉满保证流程走完）
+    var a5 = setupAuto([0.5]);
+    a5.st.commander.hp = 500; a5.st.commander.maxHp = 500;
+    a5.st.enemies.forEach(function (e) { e.hp = 999; e.maxHp = 999; });
+    AB.startFight(a5.st, a5.ev);
+    var lc = 0;
+    while (a5.st.turn < 3 && !a5.st.over) { AB.advanceRound(a5.st, a5.ev); if (++lc > 10) break; }
+    check('第 3 回合挂起下卦三选一', a5.st.phase === 'pickHex' && a5.st.pendingHex && a5.st.pendingHex.kind === 'lower');
+    AB.chooseHex(a5.st, a5.ev, a5.st.pendingHex.candidates[0].id);
+    check('选卦后恢复战斗且下卦已定', a5.st.phase === 'fight' && a5.st.lowerTrigram !== null);
+    var lc2 = 0;
+    while (a5.st.turn < 5 && !a5.st.over) { AB.advanceRound(a5.st, a5.ev); if (++lc2 > 10) break; }
+    check('第 5 回合挂起上卦三选一', a5.st.phase === 'pickHex' && a5.st.pendingHex && a5.st.pendingHex.kind === 'upper');
+    AB.chooseHex(a5.st, a5.ev, a5.st.pendingHex.candidates[0].id);
+    var lc3 = 0;
+    while (a5.st.turn < 7 && !a5.st.over) { AB.advanceRound(a5.st, a5.ev); if (++lc3 > 10) break; }
+    check('第 7 回合天命自动觉醒', a5.st.currentHexagram !== null);
+
     /* ============ 汇总 ============ */
     details = assert.slice();
     assert = [];

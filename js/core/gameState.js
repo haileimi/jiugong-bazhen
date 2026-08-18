@@ -118,7 +118,19 @@
       firstCardPlayedThisTurn: false, // 傅寅天赋：每回合第一张战斗牌 +4
       freeChase: {},            // uid -> true（赵星追击：下次打出不耗天机）
       turn: 1,
-      phase: 'home',            // home | pick | map | player | boss | reward | over
+      phase: 'home',            // home | pick | map | deploy | fight | pickHex | reward | over
+
+      /* ---- v4 自动战斗：布阵/战斗 ---- */
+      candidates: [],           // 布阵候选（从卡包抽 9 张 uid）
+      formation: new Array(9).fill(null), // 我方 3×3（0-2近战 3-5远程 6-8谋略）{uid,heroId,hp,maxHp,warLevel}
+      deployLeft: 0,            // 剩余布阵点
+      enemySlot: {},            // enemyId -> 敌方 3×3 格位（镜像：0-2谋略 3-5远程 6-8近战）
+      playerBuffs: new Array(9).fill(null), // 我方格子加成 {type:'atk'|'mult'|'def', value}
+      enemyBuffs: new Array(9).fill(null),  // 敌方格子加成
+      skillCd: {},              // 谋略单位技能冷却（uid/enemyId -> 剩余回合）
+      pendingHex: null,         // 卦象三选一挂起：{kind:'lower'|'upper', candidates:[...]}
+      atkBuff: {},              // 谋略"回气"等临时加成 uid/enemyId -> +攻
+
       upperTrigram: null,
       lowerTrigram: null,
       currentHexagram: null,

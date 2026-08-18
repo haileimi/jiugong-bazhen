@@ -23,6 +23,7 @@ const files = [
   'js/systems/hexSystem.js',
   'js/systems/ruleSystem.js',
   'js/systems/battleSystem.js',
+  'js/systems/autoBattle.js',
   'js/systems/economySystem.js',
   'js/render/cardRenderer.js',
   'js/render/battleRenderer.js',

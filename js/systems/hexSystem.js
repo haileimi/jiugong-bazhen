@@ -55,10 +55,23 @@
     return parts.join(' · ');
   }
 
+  /** 随机抽 3 个候选卦（三选一用，不重复） */
+  function pickCandidates(state) {
+    var pool = g.DSH_TRIGRAMS.TRIGRAMS.slice();
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(state.rnd() * (i + 1));
+      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    return pool.slice(0, 3).map(function (t) {
+      return { id: t.id, name: t.name, symbol: t.symbol, desc: t.desc, rules: t.rules };
+    });
+  }
+
   g.DSH_HexSystem = {
     drawLower: drawLower,
     drawUpper: drawUpper,
     resolveHexagram: resolveHexagram,
-    hexProgressText: hexProgressText
+    hexProgressText: hexProgressText,
+    pickCandidates: pickCandidates
   };
 })(typeof window !== 'undefined' ? window : globalThis);
