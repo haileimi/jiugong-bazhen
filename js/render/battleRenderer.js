@@ -73,12 +73,17 @@
     { cat: '战斗', name: '近战部', symbol: '⚔️' }
   ];
 
-  /** 魔王区：魔王本体独占最上排大卡（仅魔王战） */
+  /** 魔王区：boss 位常驻预留 —— 魔王战=本体大卡；小怪战=虚线占位 */
   function renderBossZone(state) {
     var zone = document.getElementById('boss-zone');
     if (!zone) return;
     zone.innerHTML = '';
-    if (state.battleKind !== 'boss' || !state.boss) return;
+    if (state.battleKind !== 'boss' || !state.boss) {
+      var slot = el('div', 'boss-slot empty');
+      slot.innerHTML = '<div class="bs-icon">👑</div><div>魔王位</div>';
+      zone.appendChild(slot);
+      return;
+    }
     var bossCard = createEnemyCard(state.boss, state, true);
     bossCard.classList.add('boss-card');
     if (g.DSH_GameState.bossUnlocked(state) && state.boss.hp > 0) {
