@@ -105,11 +105,11 @@
       damage: 8, desc: '对目标造成 8 点伤害，20% 暴击 ×1.5',
       skill: { name: '猎户一击', chance: 0.2, critDmg: 1.5 },
       talent: { name: '猎户本能', desc: '战斗牌伤害 +5%', type: 'battlePct', value: 5 },
-      hp: 6, defense: 1, alignment: 2, speed: 5, range: 1, starter: true, skins: [{ id: 'default', name: '原版' }] },
+      hp: 6, defense: 1, alignment: 2, speed: 5, range: 1, starter: true, friend: true, skins: [{ id: 'default', name: '原版' }] },
     { id: 'cm2', nick: '阿二', name: '药童阿二', category: '护卫', element: '木', target: 'self',
       defGain: 6, heal: 2, desc: '获得 6 点防御，恢复 2 点血量',
       talent: { name: '采药', desc: '每回合结束恢复 1 点血量', type: 'endHeal', value: 1 },
-      hp: 8, defense: 2, alignment: 2, speed: 5, range: 1, starter: true, skins: [{ id: 'default', name: '原版' }] },
+      hp: 8, defense: 2, alignment: 2, speed: 5, range: 1, starter: true, friend: true, skins: [{ id: 'default', name: '原版' }] },
     { id: 'cm3', nick: '阿三', name: '账房阿三', category: '计谋', element: '水', target: 'self',
       draw: 2, desc: '抽 2 张牌',
       talent: { name: '精打细算', desc: '每回合多抽 1 张（起手 6 张）', type: 'drawBonus', value: 1 },
@@ -121,14 +121,22 @@
       skill: { name: '佣兵王令', chance: 0.15, critDmg: 1.5 },
       aura: { atkPct: 10 }, // 邻位光环：影响左右相邻格
       talent: { name: '佣兵王令', desc: '邻位光环：左右相邻格英雄攻击 +10%', type: 'auraAtk', value: 10 },
-      hp: 15, defense: 3, alignment: 5, speed: 6, range: 1, skins: [{ id: 'default', name: '原版' }] }
+      hp: 15, defense: 3, alignment: 5, speed: 6, range: 1, skins: [{ id: 'default', name: '原版' }] },
+
+    /* ---------- v4 主角：中土遗孤·云归（固定主将，不进卡池/不可选/不可招募） ---------- */
+    { id: 'mc1', nick: '云归', name: '中土遗孤·云归', category: '战斗', element: '木', target: 'single',
+      damage: 14, desc: '对目标造成 14 点伤害，25% 伤害 ×1.5',
+      skill: { name: '中土剑法', chance: 0.25, mult: 1.5 },
+      talent: { name: '归乡执念', desc: '战斗牌伤害 +10%', type: 'battlePct', value: 10 },
+      hp: 10, defense: 2, alignment: 0, speed: 5, range: 1,
+      protagonist: true, skins: [{ id: 'default', name: '原版' }] }
   ];
 
-  /** v4 稀有度（灰/绿/蓝/金）：村民=灰、老英雄=绿、新英雄+白泽=蓝、楚烈=金 */
+  /** v4 稀有度（灰/绿/蓝/金）：村民=灰、老英雄=绿、新英雄+白泽+主角=蓝、楚烈=金 */
   var RARITY_BY_ID = {
     wz1: '绿', wz2: '绿', wz3: '绿', gs1: '绿', gs2: '绿',
     qb1: '绿', qb2: '绿', qb3: '绿', dw1: '绿', dw2: '绿', ms1: '绿', ms2: '绿',
-    bz1: '蓝', wz4: '蓝', qb4: '蓝', ms3: '蓝',
+    bz1: '蓝', wz4: '蓝', qb4: '蓝', ms3: '蓝', mc1: '蓝',
     cm1: '灰', cm2: '灰', cm3: '灰',
     g1: '金'
   };
@@ -170,6 +178,8 @@
       skill: h.skill || null,
       talent: h.talent,
       starter: !!h.starter,                        // 村民等初始角色：不入普通卡池
+      friend: !!h.friend,                          // 教学战好友（阿大/阿二）
+      protagonist: !!h.protagonist,                // 主角（固定主将）：不进卡池/不可选/不可招募
       skins: h.skins.map(function (s) { return { id: s.id, name: s.name, file: s.id + '.png' }; })
     };
   });
@@ -201,9 +211,13 @@
     STARTERS: VIEW.filter(function (h) { return h.starter; }),
     /** 金将（通关奖励/事件获得，不入常规卡池） */
     GOLD_HEROES: VIEW.filter(function (h) { return h.gold; }),
-    /** 卡包牌型：主将之外的非 starter、非金将英雄（偏将=招式） */
+    /** 教学战好友（灰色）：主角 + 好友 vs 流寇 */
+    FRIENDS: VIEW.filter(function (h) { return h.friend; }),
+    /** 主角（固定主将） */
+    PROTAGONIST: VIEW.filter(function (h) { return h.protagonist; })[0] || null,
+    /** 卡包牌型：主将之外的非 starter、非金将、非主角英雄（偏将=招式） */
     packHeroIds: function (commanderId) {
-      return VIEW.filter(function (h) { return h.id !== commanderId && !h.starter && !h.gold; })
+      return VIEW.filter(function (h) { return h.id !== commanderId && !h.starter && !h.gold && !h.protagonist; })
         .map(function (h) { return h.id; });
     }
   };

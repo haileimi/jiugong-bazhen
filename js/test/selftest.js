@@ -158,8 +158,8 @@
       check('英雄 ' + h.id + ' 主将血量>0', h.hp > 0);
       catSet[h.category] = true;
     });
-    check('英雄共 20 名（16 常规 + 村民 3 + 金将楚烈）', H.HEROES.length === 20);
-    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 20);
+    check('英雄共 21 名（16 常规 + 村民 3 + 金将楚烈 + 主角云归）', H.HEROES.length === 21);
+    check('英雄 id 唯一', new Set(H.HEROES.map(function (h) { return h.id; })).size === 21);
     check('全英雄卡字段完整（攻/防/种类/血/技能/天赋/名/诨号/立绘/头像/关键值/简介/五行/善恶/速/射程/稀有度/布阵消耗）', H.HEROES.every(function (h) {
       return h.id && h.nick && h.name && h.category && h.element && h.hp > 0 && h.desc &&
         h.attack !== undefined && h.defense !== undefined && h.alignment !== undefined &&
@@ -182,6 +182,15 @@
     check('楚烈有邻位光环（左右+10% 攻）', H.byId('g1').aura && H.byId('g1').aura.atkPct === 10);
     check('楚烈不入常规卡池', !GS.buildPack('wz1').some(function (c) { return c.heroId === 'g1'; }));
     check('楚烈布阵消耗 4 点', H.byId('g1').deployCost === 4);
+    // 主角云归（固定主将）
+    check('主角云归在册且为固定主将', !!H.PROTAGONIST && H.PROTAGONIST.id === 'mc1' && H.PROTAGONIST.protagonist === true);
+    check('主角：中土遗孤·云归·木系战斗近战·主将血40(10×4)', H.byId('mc1').name === '中土遗孤·云归' &&
+      H.byId('mc1').element === '木' && H.byId('mc1').category === '战斗' &&
+      H.byId('mc1').hp * GS.COMMANDER_HP_MULT === 40);
+    check('主角不入卡池', !GS.buildPack('wz1').some(function (c) { return c.heroId === 'mc1'; }));
+    check('教学战好友=阿大+阿二（灰色）', H.FRIENDS.length === 2 &&
+      H.FRIENDS.every(function (f) { return f.friend && f.rarity === '灰'; }) &&
+      ['cm1', 'cm2'].every(function (id) { return H.byId(id).friend; }));
     // 布阵点（v4）
     var stDp = GS.createState({ random: seqRng([0.5]) });
     stDp.layer = 1;
